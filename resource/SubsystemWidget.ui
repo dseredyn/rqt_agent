@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+  <class>SubsystemWidget</class>
+  <widget class="QWidget" name="SubsystemWidget">
+    <property name="geometry">
+      <rect>
+        <x>0</x>
+        <y>0</y>
+        <width>400</width>
+        <height>300</height>
+      </rect>
+    </property>
+    <property name="windowTitle">
+      <string>Form</string>
+    </property>
+    <property name="autoFillBackground">
+      <bool>true</bool>
+    </property>
+    <property name="palette">
+        <palette>
+          <active>
+            <color><red>0</red><green>0</green><blue>0</blue></color>   <!-- Foreground -->
+            <color><red>255</red><green>255</green><blue>255</blue></color>   <!-- Button -->
+            <color><red>255</red><green>255</green><blue>255</blue></color>   <!-- Light -->
+            <color><red>255</red><green>255</green><blue>255</blue></color>   <!-- Midlight -->
+            <color><red>255</red><green>255</green><blue>255</blue></color>   <!-- Dark -->
+            <color><red>255</red><green>255</green><blue>255</blue></color>   <!-- Mid -->
+            <color><red>0</red><green>0</green><blue>0</blue></color>   <!-- Text -->
+            <color><red>0</red><green>0</green><blue>0</blue></color>   <!-- BrightText -->
+            <color><red>0</red><green>0</green><blue>0</blue></color>   <!-- ButtonText -->
+            <color><red>255</red><green>255</green><blue>255</blue></color>   <!-- Base -->
+            <color><red>255</red><green>255</green><blue>255</blue></color>   <!-- Background -->
+            <color><red>255</red><green>255</green><blue>255</blue></color>   <!-- Shadow -->
+            <color><red>255</red><green>255</green><blue>255</blue></color>   <!-- Highlight -->
+            <color><red>0</red><green>0</green><blue>0</blue></color>   <!-- HighlightText -->
+          </active>
+          <disabled>
+            <color><red>0</red><green>0</green><blue>0</blue></color>   <!-- Foreground -->
+            <color><red>255</red><green>255</green><blue>255</blue></color>   <!-- Button -->
+            <color><red>255</red><green>255</green><blue>255</blue></color>   <!-- Light -->
+            <color><red>255</red><green>255</green><blue>255</blue></color>   <!-- Midlight -->
+            <color><red>255</red><green>255</green><blue>255</blue></color>   <!-- Dark -->
+            <color><red>255</red><green>255</green><blue>255</blue></color>   <!-- Mid -->
+            <color><red>0</red><green>0</green><blue>0</blue></color>   <!-- Text -->
+            <color><red>0</red><green>0</green><blue>0</blue></color>   <!-- BrightText -->
+            <color><red>0</red><green>0</green><blue>0</blue></color>   <!-- ButtonText -->
+            <color><red>255</red><green>255</green><blue>255</blue></color>   <!-- Base -->
+            <color><red>255</red><green>255</green><blue>255</blue></color>   <!-- Background -->
+            <color><red>255</red><green>255</green><blue>255</blue></color>   <!-- Shadow -->
+            <color><red>255</red><green>255</green><blue>255</blue></color>   <!-- Highlight -->
+            <color><red>0</red><green>0</green><blue>0</blue></color>   <!-- HighlightText -->
+          </disabled>
+          <inactive>
+            <color><red>0</red><green>0</green><blue>0</blue></color>   <!-- Foreground -->
+            <color><red>255</red><green>255</green><blue>255</blue></color>   <!-- Button -->
+            <color><red>255</red><green>255</green><blue>255</blue></color>   <!-- Light -->
+            <color><red>255</red><green>255</green><blue>255</blue></color>   <!-- Midlight -->
+            <color><red>255</red><green>255</green><blue>255</blue></color>   <!-- Dark -->
+            <color><red>255</red><green>255</green><blue>255</blue></color>   <!-- Mid -->
+            <color><red>0</red><green>0</green><blue>0</blue></color>   <!-- Text -->
+            <color><red>0</red><green>0</green><blue>0</blue></color>   <!-- BrightText -->
+            <color><red>0</red><green>0</green><blue>0</blue></color>   <!-- ButtonText -->
+            <color><red>255</red><green>255</green><blue>255</blue></color>   <!-- Base -->
+            <color><red>255</red><green>255</green><blue>255</blue></color>   <!-- Background -->
+            <color><red>255</red><green>255</green><blue>255</blue></color>   <!-- Shadow -->
+            <color><red>255</red><green>255</green><blue>255</blue></color>   <!-- Highlight -->
+            <color><red>0</red><green>0</green><blue>0</blue></color>   <!-- HighlightText -->
+          </inactive>
+        </palette>
+    </property>
+    <widget class="QLabel" name="SubsystemName">
+      <property name="geometry">
+        <rect>
+          <x>10</x>
+          <y>6</y>
+          <width>300</width>
+          <height>27</height>
+        </rect>
+      </property>
+      <property name="text">
+        <string>SubsystemName</string>
+      </property>
+    </widget>
+  </widget>
+  <resources/>
+  <connections/>
+</ui>
