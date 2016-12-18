@@ -35,7 +35,7 @@ import os
 
 from python_qt_binding import loadUi
 from python_qt_binding.QtCore import Qt, QTimer, Signal, Slot
-from python_qt_binding.QtWidgets import QHeaderView, QMenu, QTreeWidgetItem, QWidget
+from python_qt_binding.QtWidgets import QHeaderView, QMenu, QTreeWidgetItem, QWidget, QPushButton, QVBoxLayout, QHBoxLayout, QLabel
 import roslib
 import rospkg
 import rospy
@@ -59,6 +59,22 @@ class SubsystemWidget(QWidget):
 
     _column_names = ['topic', 'type', 'bandwidth', 'rate', 'value']
 
+# ___________________________________________________________
+# |[ipc_buffers]                                             |
+# |                     subsystem_name                       |
+# |  master_component                                        |
+# |  subsystem_state       [components]                      |
+# |                        [components]                      |
+# |                        [components]                      |
+# |                        [components]                      |
+# |                        [components]                      |
+# |                                                          |
+# |                                                          |
+# |                                                          |
+# |                                                          |
+# |[ipc_buffers]                                             |
+# |__________________________________________________________|
+
     def __init__(self, plugin=None, name=None):
         """
         @type selected_topics: list of tuples.
@@ -71,6 +87,7 @@ class SubsystemWidget(QWidget):
         """
         super(SubsystemWidget, self).__init__()
 
+        self.initialized = False
 
         rp = rospkg.RosPack()
         ui_file = os.path.join(rp.get_path('rqt_agent'), 'resource', 'SubsystemWidget.ui')
@@ -90,6 +107,10 @@ class SubsystemWidget(QWidget):
 
         self.buffer_info = None
 
+        self.state = ''
+        self.behavior = ''
+
+        self.buffer_groups = {}
 #        self.topics_tree_widget.sortByColumn(0, Qt.AscendingOrder)
 #        header = self.topics_tree_widget.header()
 #        header.setResizeMode(QHeaderView.ResizeToContents)
@@ -113,6 +134,13 @@ class SubsystemWidget(QWidget):
 #        self._timer_refresh_topics = QTimer(self)
 #        self._timer_refresh_topics.timeout.connect(self.refresh_topics)
 
+    def setStateName(self, state, behavior):
+        self.state = state
+        self.behavior = behavior
+
+    def isInitialized(self):
+        return self.initialized
+
     def update_subsystem(self):
         #rospy.wait_for_service('/' + name = '/getSubsystemInfo')
         if self.buffer_info == None:
@@ -124,6 +152,167 @@ class SubsystemWidget(QWidget):
 
             if self.buffer_info != None:
                 print self.buffer_info
+
+            # show buffers
+            # TODO: first, pair up inputs and outputs, then place other output buffers and other input buffers
+#            added_buf = False
+#            for i in range(max(len(self.buffer_info.lower_inputs), len(self.buffer_info.lower_outputs))):
+#                if i < len(self.buffer_info.lower_outputs) and self.buffer_info.lower_outputs_ipc[i]:
+#                    btn = QPushButton('out')
+#                    btn.setToolTip(self.buffer_info.lower_outputs[i])
+#                    self.lower_buffers_layout.addStretch()
+#                    self.lower_buffers_layout.addWidget(btn)
+#                    added_buf = True
+#                if i < len(self.buffer_info.lower_inputs) and self.buffer_info.lower_inputs_ipc[i]:
+#                    btn = QPushButton('in')
+#                    btn.setToolTip(self.buffer_info.lower_inputs[i])
+#                    self.lower_buffers_layout.addStretch()
+#                    self.lower_buffers_layout.addWidget(btn)
+#                    added_buf = True
+#            if added_buf:
+#                self.lower_buffers_layout.addStretch()
+
+#            added_buf = False
+#            for i in range(max(len(self.buffer_info.upper_inputs), len(self.buffer_info.upper_outputs))):
+#                if i < len(self.buffer_info.upper_inputs) and self.buffer_info.upper_inputs_ipc[i]:
+#                    btn = QPushButton('in')
+#                    btn.setToolTip(self.buffer_info.upper_inputs[i])
+#                    self.upper_buffers_layout.addStretch()
+#                    self.upper_buffers_layout.addWidget(btn)
+#                    added_buf = True
+#                if i < len(self.buffer_info.upper_outputs) and self.buffer_info.upper_outputs_ipc[i]:
+#                    btn = QPushButton('out')
+#                    btn.setToolTip(self.buffer_info.upper_outputs[i])
+#                    self.upper_buffers_layout.addStretch()
+#                    self.upper_buffers_layout.addWidget(btn)
+#                    added_buf = True
+#            if added_buf:
+#                self.upper_buffers_layout.addStretch()
+            self.initialized = True
+
+        beg_idx = self.state.find('state:')
+        if beg_idx >= 0:
+            end_idx = self.state.find(',', beg_idx)
+            if end_idx >= 0:
+                state_name = self.state[beg_idx+6:end_idx]
+            else:
+                state_name = self.state[beg_idx+6]
+            self.SubsystemState.setText(state_name)#.strip())
+
+        beg_idx = self.state.find('behavior:')
+        if beg_idx >= 0:
+            end_idx = self.state.find(',', beg_idx)
+            if end_idx >= 0:
+                behavior_name = self.state[beg_idx+9:end_idx]
+            else:
+                behavior_name = self.state[beg_idx+9]
+            self.SubsystemBehavior.setText(behavior_name)#.strip())
+
+    def getCommonBuffers(self, subsystem):
+        if not self.isInitialized() or not subsystem.isInitialized():
+            return None
+        if (subsystem.buffer_info == None) or (self.buffer_info == None):
+            return None
+        common_buffers = None
+        for this_index in range(len(self.buffer_info.upper_inputs)):
+            up_in = self.buffer_info.upper_inputs[this_index]
+            if not self.buffer_info.upper_inputs_ipc[this_index]:
+                continue
+            for index in range(len(subsystem.buffer_info.lower_outputs)):
+                lo_out = subsystem.buffer_info.lower_outputs[index]
+                if not subsystem.buffer_info.lower_outputs_ipc[index]:
+                    continue
+                if up_in == lo_out:
+                    if common_buffers == None:
+                        common_buffers = []
+                    common_buffers.append(up_in)
+
+        for this_index in range(len(self.buffer_info.upper_outputs)):
+            up_out = self.buffer_info.upper_outputs[this_index]
+            if not self.buffer_info.upper_outputs_ipc[this_index]:
+                continue
+            for index in range(len(subsystem.buffer_info.lower_inputs)):
+                lo_in = subsystem.buffer_info.lower_inputs[index]
+                if not subsystem.buffer_info.lower_inputs_ipc[index]:
+                    continue
+                if up_out == lo_in:
+                    if common_buffers == None:
+                        common_buffers = []
+                    common_buffers.append(up_out)
+        return common_buffers
+
+    def getCommonString(self, str_list):
+        idx = 0
+        while True:
+            character = None
+            for s in str_list:
+                if idx >= len(s):
+                    return s
+                if character == None:
+                    character = s[idx]
+                elif character != s[idx]:
+                    return s[:idx]
+            idx = idx + 1
+        return None     # this is never reached
+
+    def groupBuffers(self, buffer_list, group_name):
+        if buffer_list == None or len(buffer_list) == 0:
+            print "Error in %s.groupBuffers(%s, %s): buffers list is None or empty"%(self.subsystem_name, buffer_list, group_name)
+            return False
+        if group_name in self.buffer_groups:
+            # TODO: remove old buffer widgets
+            return False
+        self.buffer_groups[group_name] = buffer_list
+
+        lo_in = []
+        up_in = []
+        lo_out = []
+        up_out = []
+
+        for buf_name in buffer_list:
+            if buf_name in self.buffer_info.lower_inputs:
+                lo_in.append(buf_name)
+            elif buf_name in self.buffer_info.upper_inputs:
+                up_in.append(buf_name)
+            elif buf_name in self.buffer_info.lower_outputs:
+                lo_out.append(buf_name)
+            elif buf_name in self.buffer_info.upper_outputs:
+                up_out.append(buf_name)
+
+        # buffer group should be either in lower part or upper part
+        if (len(lo_in) > 0 or len(lo_out) > 0) and (len(up_in) > 0 or len(up_out) > 0):
+            print "Error in %s.groupBuffers(%s, %s): mixed upper and lower buffers"%(self.subsystem_name, buffer_list, group_name)
+            return False
+
+        # get most common part of buffers' names
+        name_list = []
+        common_name = self.getCommonString(buffer_list)
+        for idx in range(len(buffer_list)):
+            name_list.append( buffer_list[idx][len(common_name):] )
+
+        print common_name, name_list
+
+        vbox = QVBoxLayout()
+
+        hbox1 = QHBoxLayout()
+        hbox1.addStretch()
+        hbox1.addWidget(QLabel(common_name))
+        hbox1.addStretch()
+
+        hbox2 = QHBoxLayout()
+        for buf_name in name_list:
+            hbox2.addStretch()
+            hbox2.addWidget(QPushButton(buf_name))
+        hbox2.addStretch()
+
+        if len(lo_in) > 0 or len(lo_out) > 0:
+            vbox.addLayout(hbox1)
+            vbox.addLayout(hbox2)
+            self.lower_buffers_layout.addLayout(vbox)
+        else:
+            vbox.addLayout(hbox2)
+            vbox.addLayout(hbox1)
+            self.upper_buffers_layout.addLayout(vbox)
 
     def getOtherSubsystemRelativePose(self, subsystem):
         if (subsystem.buffer_info == None) or (self.buffer_info == None):

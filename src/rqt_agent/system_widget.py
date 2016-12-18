@@ -35,7 +35,7 @@ import os
 
 from python_qt_binding import loadUi
 from python_qt_binding.QtCore import Qt, QTimer, Signal, Slot
-from python_qt_binding.QtWidgets import QHeaderView, QMenu, QTreeWidgetItem, QWidget, QVBoxLayout, QLabel
+from python_qt_binding.QtWidgets import QHeaderView, QMenu, QTreeWidgetItem, QWidget, QVBoxLayout, QLabel, QPushButton
 #from PyQt5 import QtCore, QtGui, QtWidgets
 import roslib
 import rospkg
@@ -82,7 +82,14 @@ class SystemWidget(QWidget):
         ui_file = os.path.join(rp.get_path('rqt_agent'), 'resource', 'SystemWidget.ui')
         loadUi(ui_file, self)
 
-#        self.verticalLayout.addWidget(nameLabel)
+#        btn = QPushButton('Nacisnij mnie Agnieszko')
+#        cpt = QLabel()
+#        @Slot()
+#        def on_click():
+#            cpt.setText("KOCHAM CIE!")
+#        btn.clicked.connect(on_click)
+#        self.verticalLayout.addWidget(btn)
+#        self.verticalLayout.addWidget(cpt)
 
         self._plugin = plugin
 #        self.topics_tree_widget.sortByColumn(0, Qt.AscendingOrder)
@@ -125,30 +132,48 @@ class SystemWidget(QWidget):
         s_g_parents = {}
 
         names = []
-
         for w1_name in self._widgets:
             names.append(w1_name)
+
+        for w1_name in self._widgets:
             w1 = self._widgets[w1_name]
+            if not w1.isInitialized():
+                continue
             for w2_name in self._widgets:
                 w2 = self._widgets[w2_name]
-                rel_pose = w1.getOtherSubsystemRelativePose(w2)
-                if rel_pose != None and rel_pose[0] == 'below':
-                    if not w1_name in s_g:
-                        s_g[w1_name] = {}
-                    s_g[w1_name][rel_pose[1]] = w2_name
-                    s_g_parents[w2_name] = w1_name
+                if not w2.isInitialized():
+                    continue
+                common_buffers = w1.getCommonBuffers(w2)
+                if common_buffers != None:
+                    w1.groupBuffers(common_buffers, w2.subsystem_name)
+                    w2.groupBuffers(common_buffers, w1.subsystem_name)
 
-        # get top-most subsystem
-        root = None
-        if s_g_parents:
-            root = list(s_g_parents.keys())[0]
-            while root in s_g_parents:
-                root = s_g_parents[root]
-
-        if root == None:
-            return (None, names)
-
-        return (root, s_g)
+#        for w1_name in self._widgets:
+#            w1 = self._widgets[w1_name]
+#            if not w1.isInitialized():
+#                continue
+#            for w2_name in self._widgets:
+#                w2 = self._widgets[w2_name]
+#                if not w2.isInitialized():
+#                    continue
+#                rel_pose = w1.getOtherSubsystemRelativePose(w2)
+#                if rel_pose != None and rel_pose[0] == 'below':
+#                    if not w1_name in s_g:
+#                        s_g[w1_name] = {}
+#                    s_g[w1_name][rel_pose[1]] = w2_name
+#                    s_g_parents[w2_name] = w1_name
+#
+#        # get top-most subsystem
+#        root = None
+#        if s_g_parents:
+#            root = list(s_g_parents.keys())[0]
+#            while root in s_g_parents:
+#                root = s_g_parents[root]
+#
+#        if root == None:
+#            return (None, names)
+#
+#        return (root, s_g)
 
     @Slot()
     def refresh_topics(self):
@@ -197,7 +222,6 @@ class SystemWidget(QWidget):
 
             if (msg != None) and (len(msg.status) == 2) and \
               msg.status[0].name == 'components' and msg.status[1].name == 'diagnostics':
-                print "aa"
                 name_split = subsystem_name.split('/')
 
                 if not subsystem_name in self._widgets:
@@ -206,6 +230,12 @@ class SystemWidget(QWidget):
                 else:
                     new_widgets[subsystem_name] = self._widgets[subsystem_name]
                     del self._widgets[subsystem_name]
+
+                for value in msg.status[1].values:
+                    if value.key == 'master_component':
+                        new_widgets[subsystem_name].setStateName(value.value, '')
+                        break
+
 
         self._widgets = new_widgets
 
