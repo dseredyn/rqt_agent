@@ -302,7 +302,11 @@ class SubsystemWidget(QWidget):
         hbox2 = QHBoxLayout()
         for buf_name in name_list:
             hbox2.addStretch()
-            hbox2.addWidget(QPushButton(buf_name))
+            if common_name+buf_name in lo_in or common_name+buf_name in up_out:
+                suffix = ' /\\'
+            else:
+                suffix = ' \\/'
+            hbox2.addWidget(QPushButton(buf_name + suffix))
         hbox2.addStretch()
 
         if len(lo_in) > 0 or len(lo_out) > 0:
