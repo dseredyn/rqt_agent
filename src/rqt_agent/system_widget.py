@@ -106,9 +106,13 @@ class SystemWidget(QWidget):
         self._subsystems = {}
 
         self._widgets = {}
+        self.prev_subsystems = []
+        
 
         self.structure_root = None
         self.structure_graph = None
+
+        self.structure_changed = False
 
 #        self._tree_items = {}
 #        self._column_index = {}
@@ -121,6 +125,25 @@ class SystemWidget(QWidget):
         self._timer_refresh_topics = QTimer(self)
         self._timer_refresh_topics.timeout.connect(self.refresh_topics)
 
+    def checkStructureChange(self):
+        result = False
+        for subsystem_name in self.prev_subsystems:
+            if not subsystem_name in self._widgets:
+                result = True
+                break;
+
+        if result == False:
+            for subsystem_name in self._widgets:
+                if not subsystem_name in self.prev_subsystems:
+                    result = True
+                    break
+
+        self.prev_subsystems = []
+        for subsystem_name in self._widgets:
+            self.prev_subsystems.append(subsystem_name)
+
+        return result
+
     def start(self):
         """
         This method needs to be called to start updating topic pane.
@@ -128,12 +151,10 @@ class SystemWidget(QWidget):
         self._timer_refresh_topics.start(1000)
 
     def generateStructure(self):
-        s_g = {}
-        s_g_parents = {}
-
         names = []
         for w1_name in self._widgets:
             names.append(w1_name)
+            self._widgets[w1_name].resetBuffersLayout()
 
         for w1_name in self._widgets:
             w1 = self._widgets[w1_name]
@@ -148,32 +169,49 @@ class SystemWidget(QWidget):
                     w1.groupBuffers(common_buffers, w2.subsystem_name)
                     w2.groupBuffers(common_buffers, w1.subsystem_name)
 
-#        for w1_name in self._widgets:
-#            w1 = self._widgets[w1_name]
-#            if not w1.isInitialized():
-#                continue
-#            for w2_name in self._widgets:
-#                w2 = self._widgets[w2_name]
-#                if not w2.isInitialized():
-#                    continue
-#                rel_pose = w1.getOtherSubsystemRelativePose(w2)
-#                if rel_pose != None and rel_pose[0] == 'below':
-#                    if not w1_name in s_g:
-#                        s_g[w1_name] = {}
-#                    s_g[w1_name][rel_pose[1]] = w2_name
-#                    s_g_parents[w2_name] = w1_name
-#
-#        # get top-most subsystem
-#        root = None
-#        if s_g_parents:
-#            root = list(s_g_parents.keys())[0]
-#            while root in s_g_parents:
-#                root = s_g_parents[root]
-#
-#        if root == None:
-#            return (None, names)
-#
-#        return (root, s_g)
+        parents_dict = {}
+        for w1_name in self._widgets:
+            w1 = self._widgets[w1_name]
+            if not w1.isInitialized():
+                continue
+            for w2_name in self._widgets:
+                w2 = self._widgets[w2_name]
+                if not w2.isInitialized():
+                    continue
+                rel_pose = w1.getLowerSubsystemPosition(w2.subsystem_name)
+                if rel_pose != -1:
+                    parents_dict[w2_name] = w1_name
+
+#        print parents_dict
+
+        # get top-most subsystem (root)
+        root = None
+        if parents_dict:
+            root = list(parents_dict.keys())[0]
+            while root in parents_dict:
+                root = parents_dict[root]
+
+        levels = []
+        if root == None:
+            pass
+            # there are no subsystem
+        else:
+            levels.append([root])
+
+            while True:
+                # expand all subsystems in the lowest level
+                current_lowest = levels[-1]
+                next_lower_level = []
+                for s in current_lowest:
+                    lower_list = self._widgets[s].getLowerSubsystems()
+                    next_lower_level = next_lower_level + lower_list
+                if len(next_lower_level) == 0:
+                    break
+                else:
+                    levels.append(next_lower_level)
+
+        print "levels:", levels
+        return levels
 
     @Slot()
     def refresh_topics(self):
@@ -239,7 +277,22 @@ class SystemWidget(QWidget):
 
         self._widgets = new_widgets
 
-        self.generateStructure()
+
+        structure_change = self.checkStructureChange()
+
+        if structure_change:
+            self.structure_change = True
+
+        if self.structure_change:
+            allInitialized = True
+            for subsystem_name in self._widgets:
+                if not self._widgets[subsystem_name].isInitialized():
+                    allInitialized = False
+                    break
+            if allInitialized:
+                levels = self.generateStructure()
+                # TODO
+                self.structure_change = False
 
         #TODO: compare new structure with previous one and update the view (dictionary comparison)
 

@@ -75,6 +75,10 @@ class SubsystemWidget(QWidget):
 # |[ipc_buffers]                                             |
 # |__________________________________________________________|
 
+    def resetBuffersLayout(self):
+        self.buffer_groups = {}
+        self.lower_subsystems = []
+
     def __init__(self, plugin=None, name=None):
         """
         @type selected_topics: list of tuples.
@@ -94,7 +98,6 @@ class SubsystemWidget(QWidget):
         loadUi(ui_file, self)
         self._plugin = plugin
 
-#        print dir(self)
         print "created Subsystem widget"
 
         if name != None:
@@ -104,13 +107,12 @@ class SubsystemWidget(QWidget):
 
         self.subsystem_name = name
 
-
         self.buffer_info = None
-
         self.state = ''
         self.behavior = ''
 
-        self.buffer_groups = {}
+        self.resetBuffersLayout()
+
 #        self.topics_tree_widget.sortByColumn(0, Qt.AscendingOrder)
 #        header = self.topics_tree_widget.header()
 #        header.setResizeMode(QHeaderView.ResizeToContents)
@@ -220,14 +222,14 @@ class SubsystemWidget(QWidget):
             idx = idx + 1
         return None     # this is never reached
 
-    def groupBuffers(self, buffer_list, group_name):
+    def groupBuffers(self, buffer_list, subsystem_name):
         if buffer_list == None or len(buffer_list) == 0:
-            print "Error in %s.groupBuffers(%s, %s): buffers list is None or empty"%(self.subsystem_name, buffer_list, group_name)
+            print "Error in %s.groupBuffers(%s, %s): buffers list is None or empty"%(self.subsystem_name, buffer_list, subsystem_name)
             return False
-        if group_name in self.buffer_groups:
+        if subsystem_name in self.buffer_groups:
             # TODO: remove old buffer widgets
             return False
-        self.buffer_groups[group_name] = buffer_list
+        self.buffer_groups[subsystem_name] = buffer_list
 
         lo_in = []
         up_in = []
@@ -246,7 +248,7 @@ class SubsystemWidget(QWidget):
 
         # buffer group should be either in lower part or upper part
         if (len(lo_in) > 0 or len(lo_out) > 0) and (len(up_in) > 0 or len(up_out) > 0):
-            print "Error in %s.groupBuffers(%s, %s): mixed upper and lower buffers"%(self.subsystem_name, buffer_list, group_name)
+            print "Error in %s.groupBuffers(%s, %s): mixed upper and lower buffers"%(self.subsystem_name, buffer_list, subsystem_name)
             return False
 
         # get most common part of buffers' names
@@ -278,38 +280,45 @@ class SubsystemWidget(QWidget):
             vbox.addLayout(hbox1)
             vbox.addLayout(hbox2)
             self.lower_buffers_layout.addLayout(vbox)
+            self.lower_subsystems.append(subsystem_name)
         else:
             vbox.addLayout(hbox2)
             vbox.addLayout(hbox1)
             self.upper_buffers_layout.addLayout(vbox)
 
-    def getOtherSubsystemRelativePose(self, subsystem):
-        if (subsystem.buffer_info == None) or (self.buffer_info == None):
-            return None
+    def getLowerSubsystemPosition(self, subsystem_name):
+        for i in range(len(self.lower_subsystems)):
+            if self.lower_subsystems[i] == subsystem_name:
+                return i
+        return -1
 
-        for this_index in range(len(self.buffer_info.upper_inputs)):
-            up_in = self.buffer_info.upper_inputs[this_index]
-            if not self.buffer_info.upper_inputs_ipc[this_index]:
-                continue
-            for index in range(len(subsystem.buffer_info.lower_outputs)):
-                lo_out = subsystem.buffer_info.lower_outputs[index]
-                if not subsystem.buffer_info.lower_outputs_ipc[index]:
-                    continue
-                if up_in == lo_out:
-                    return ("above", None)
+    def getLowerSubsystems(self):
+        return self.lower_subsystems
 
-        for this_index in range(len(self.buffer_info.lower_inputs)):
-            lo_in = self.buffer_info.lower_inputs[this_index]
-            if not self.buffer_info.lower_inputs_ipc[this_index]:
-                continue
-            for index in range(len(subsystem.buffer_info.upper_outputs)):
-                up_out = subsystem.buffer_info.upper_outputs[index]
-                if not subsystem.buffer_info.upper_outputs_ipc[index]:
-                    continue
-                if lo_in == up_out:
-                    return ("below", this_index)
-
-        return None
+#    def getOtherSubsystemRelativePose(self, subsystem):
+#        if (subsystem.buffer_info == None) or (self.buffer_info == None):
+#            return None
+#        for this_index in range(len(self.buffer_info.upper_inputs)):
+#            up_in = self.buffer_info.upper_inputs[this_index]
+#            if not self.buffer_info.upper_inputs_ipc[this_index]:
+#                continue
+#            for index in range(len(subsystem.buffer_info.lower_outputs)):
+#                lo_out = subsystem.buffer_info.lower_outputs[index]
+#                if not subsystem.buffer_info.lower_outputs_ipc[index]:
+#                    continue
+#                if up_in == lo_out:
+#                    return ("above", None)
+#        for this_index in range(len(self.buffer_info.lower_inputs)):
+#            lo_in = self.buffer_info.lower_inputs[this_index]
+#            if not self.buffer_info.lower_inputs_ipc[this_index]:
+#                continue
+#            for index in range(len(subsystem.buffer_info.upper_outputs)):
+#                up_out = subsystem.buffer_info.upper_outputs[index]
+#                if not subsystem.buffer_info.upper_outputs_ipc[index]:
+#                    continue
+#                if lo_in == up_out:
+#                    return ("below", this_index)
+#        return None
 
     def start(self):
         """
