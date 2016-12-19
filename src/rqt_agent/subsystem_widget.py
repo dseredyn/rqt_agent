@@ -153,41 +153,6 @@ class SubsystemWidget(QWidget):
             if self.buffer_info != None:
                 print self.buffer_info
 
-            # show buffers
-            # TODO: first, pair up inputs and outputs, then place other output buffers and other input buffers
-#            added_buf = False
-#            for i in range(max(len(self.buffer_info.lower_inputs), len(self.buffer_info.lower_outputs))):
-#                if i < len(self.buffer_info.lower_outputs) and self.buffer_info.lower_outputs_ipc[i]:
-#                    btn = QPushButton('out')
-#                    btn.setToolTip(self.buffer_info.lower_outputs[i])
-#                    self.lower_buffers_layout.addStretch()
-#                    self.lower_buffers_layout.addWidget(btn)
-#                    added_buf = True
-#                if i < len(self.buffer_info.lower_inputs) and self.buffer_info.lower_inputs_ipc[i]:
-#                    btn = QPushButton('in')
-#                    btn.setToolTip(self.buffer_info.lower_inputs[i])
-#                    self.lower_buffers_layout.addStretch()
-#                    self.lower_buffers_layout.addWidget(btn)
-#                    added_buf = True
-#            if added_buf:
-#                self.lower_buffers_layout.addStretch()
-
-#            added_buf = False
-#            for i in range(max(len(self.buffer_info.upper_inputs), len(self.buffer_info.upper_outputs))):
-#                if i < len(self.buffer_info.upper_inputs) and self.buffer_info.upper_inputs_ipc[i]:
-#                    btn = QPushButton('in')
-#                    btn.setToolTip(self.buffer_info.upper_inputs[i])
-#                    self.upper_buffers_layout.addStretch()
-#                    self.upper_buffers_layout.addWidget(btn)
-#                    added_buf = True
-#                if i < len(self.buffer_info.upper_outputs) and self.buffer_info.upper_outputs_ipc[i]:
-#                    btn = QPushButton('out')
-#                    btn.setToolTip(self.buffer_info.upper_outputs[i])
-#                    self.upper_buffers_layout.addStretch()
-#                    self.upper_buffers_layout.addWidget(btn)
-#                    added_buf = True
-#            if added_buf:
-#                self.upper_buffers_layout.addStretch()
             self.initialized = True
 
         beg_idx = self.state.find('state:')
@@ -196,8 +161,8 @@ class SubsystemWidget(QWidget):
             if end_idx >= 0:
                 state_name = self.state[beg_idx+6:end_idx]
             else:
-                state_name = self.state[beg_idx+6]
-            self.SubsystemState.setText(state_name)#.strip())
+                state_name = self.state[beg_idx+6:]
+            self.SubsystemState.setText(state_name.strip())
 
         beg_idx = self.state.find('behavior:')
         if beg_idx >= 0:
@@ -205,8 +170,8 @@ class SubsystemWidget(QWidget):
             if end_idx >= 0:
                 behavior_name = self.state[beg_idx+9:end_idx]
             else:
-                behavior_name = self.state[beg_idx+9]
-            self.SubsystemBehavior.setText(behavior_name)#.strip())
+                behavior_name = self.state[beg_idx+9:]
+            self.SubsystemBehavior.setText(behavior_name.strip())
 
     def getCommonBuffers(self, subsystem):
         if not self.isInitialized() or not subsystem.isInitialized():
