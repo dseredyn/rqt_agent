@@ -116,7 +116,6 @@ class SystemWidget(QWidget):
         self.structure_changed = False
 
 
-        print dir(self.verticalLayout)
 #        self._tree_items = {}
 #        self._column_index = {}
 #        for column_name in self._column_names:
@@ -217,7 +216,13 @@ class SystemWidget(QWidget):
                     levels.append(next_lower_level)
 
             # TODO: manage disjoint trees
-
+            added_subsystems = []
+            for l in levels:
+                for s in l:
+                    added_subsystems.append(s)
+            for w_name in self._widgets:
+                if not w_name in added_subsystems:
+                    print "WARNING: subsystem %s is not in the main tree. This is not implemented."%(w_name)
 
         print "levels:", levels
         return levels
@@ -284,10 +289,10 @@ class SystemWidget(QWidget):
                     new_widgets[subsystem_name] = self._widgets[subsystem_name]
 #                    del self._widgets[subsystem_name]
 
-                for value in msg.status[1].values:
-                    if value.key == 'master_component':
-                        new_widgets[subsystem_name].setStateName(value.value, '')
-                        break
+#                for value in msg.status[1].values:
+#                    if value.key == 'master_component':
+#                        new_widgets[subsystem_name].setStateName(value.value, '')
+#                        break
 
 
         self._widgets = new_widgets
@@ -335,8 +340,8 @@ class SystemWidget(QWidget):
                 # TODO
                 self.structure_changed = False
 
-        for widget_name in self._widgets:
-            self._widgets[widget_name].update_subsystem()
+        for subsystem_name in self._widgets:
+            self._widgets[subsystem_name].update_subsystem(self._subsystems[subsystem_name].last_message)
 
 
     def update_value(self, topic_name, message):

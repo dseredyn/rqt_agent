@@ -35,7 +35,8 @@ import os
 
 from python_qt_binding import loadUi
 from python_qt_binding.QtCore import Qt, QTimer, Signal, Slot
-from python_qt_binding.QtWidgets import QHeaderView, QMenu, QTreeWidgetItem, QWidget, QPushButton, QVBoxLayout, QHBoxLayout, QLabel
+from python_qt_binding.QtWidgets import QHeaderView, QMenu, QTreeWidgetItem, QWidget, QPushButton, QVBoxLayout, QHBoxLayout, QLabel, QListWidgetItem
+from python_qt_binding.QtGui import QColor, QBrush
 import roslib
 import rospkg
 import rospy
@@ -84,18 +85,6 @@ class SubsystemWidget(QWidget):
 
         print self.subsystem_name, ".resetBuffersLayout()"
 
-#        for layout in self.buffers_layouts:
-#            print "layout", layout
-#            widgets = self.layout_widgets( layout )
-#            for w in widgets:
-#                print "widget", w
-#                try:
-#                    w.widget().hide()
-#                except:
-#                    pass
-#                layout.removeItem(w)
-#        self.buffers_layouts = []
-
         for buf in self.all_buffers:
             self.all_buffers[buf].hide()
 
@@ -110,15 +99,6 @@ class SubsystemWidget(QWidget):
             if w == None:
                 break;
             del w
-
-#        widgets = self.layout_widgets( self.lower_buffers_layout )
-#        for w in widgets:
-#            self.lower_buffers_layout.removeItem(w)
-#            del w
-#        widgets = self.layout_widgets( self.upper_buffers_layout )
-#        for w in widgets:
-#            self.upper_buffers_layout.removeItem(w)
-#            del w
 
     def __init__(self, plugin=None, name=None):
         """
@@ -152,9 +132,10 @@ class SubsystemWidget(QWidget):
         self.state = ''
         self.behavior = ''
 
-#        self.buffers_layouts = []
         self.all_buffers = {}
         self.resetBuffersLayout()
+
+        self.components = {}
 
 #        self.topics_tree_widget.sortByColumn(0, Qt.AscendingOrder)
 #        header = self.topics_tree_widget.header()
@@ -179,14 +160,58 @@ class SubsystemWidget(QWidget):
 #        self._timer_refresh_topics = QTimer(self)
 #        self._timer_refresh_topics.timeout.connect(self.refresh_topics)
 
-    def setStateName(self, state, behavior):
-        self.state = state
-        self.behavior = behavior
+#    def setStateName(self, state, behavior):
+#        self.state = state
+#        self.behavior = behavior
 
     def isInitialized(self):
         return self.initialized
 
-    def update_subsystem(self):
+    def update_subsystem(self, msg):
+        for value in msg.status[1].values:
+            if value.key == 'master_component':
+                self.state = value.value
+            elif value.key[-2:] == 'Rx' or value.key[-2:] == 'Tx':
+                if value.key[0:-2] in self.all_buffers:
+                    if value.value == '<data ok>':
+                        self.all_buffers[value.key[:-2]].setStyleSheet("background-color: green")
+                    else:
+                        self.all_buffers[value.key[:-2]].setStyleSheet("background-color: red")
+                    self.all_buffers[value.key[:-2]].setToolTip(value.value)
+
+        # iterate through components and add them to QListWidget
+        for value in msg.status[0].values:
+            if not value.key in self.components:
+                item = QListWidgetItem()
+                item.setText(value.key)
+                self.components[value.key] = item
+                self.listWidget.addItem(item)
+
+        for value in msg.status[0].values:
+            b = QBrush(QColor(0,0,255)) # unconfigured/preoperational
+            tooltip = 'unconfigured/preoperational'
+            if value.value == 'S':      # stopped
+                b = QBrush(QColor(255,255,255))
+                tooltip = 'stopped'
+            elif value.value == 'R':    # running
+                b = QBrush(QColor(0,255,0))
+                tooltip = 'running'
+            elif value.value == 'E':    # error
+                b = QBrush(QColor(255,0,0))
+                tooltip = 'error'
+            elif value.value == 'F':    # fatal error
+                b = QBrush(QColor(255,127,127))
+                tooltip = 'fatal error'
+            elif value.value == 'X':    # exception
+                b = QBrush(QColor(0,255,255))
+                tooltip = 'exception'
+            self.components[value.key].setBackground(b)
+            self.components[value.key].setToolTip(tooltip)
+
+        for value in msg.status[1].values:
+            if value.key in self.components:
+                self.components[value.key].setText(value.key + ' (' + value.value + ')')
+
         #rospy.wait_for_service('/' + name = '/getSubsystemInfo')
         if self.buffer_info == None:
             try:
@@ -339,9 +364,6 @@ class SubsystemWidget(QWidget):
             vbox.addLayout(hbox2)
             vbox.addLayout(hbox1)
             self.upper_buffers_layout.addLayout(vbox)
-
-#        self.buffers_layouts.append(hbox1)
-#        self.buffers_layouts.append(hbox2)
 
     def getLowerSubsystemPosition(self, subsystem_name):
         for i in range(len(self.lower_subsystems)):
