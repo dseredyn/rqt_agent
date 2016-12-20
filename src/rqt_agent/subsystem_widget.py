@@ -75,9 +75,50 @@ class SubsystemWidget(QWidget):
 # |[ipc_buffers]                                             |
 # |__________________________________________________________|
 
+    def layout_widgets(self, layout):
+       return (layout.itemAt(i) for i in range(layout.count()))
+
     def resetBuffersLayout(self):
         self.buffer_groups = {}
         self.lower_subsystems = []
+
+        print self.subsystem_name, ".resetBuffersLayout()"
+
+#        for layout in self.buffers_layouts:
+#            print "layout", layout
+#            widgets = self.layout_widgets( layout )
+#            for w in widgets:
+#                print "widget", w
+#                try:
+#                    w.widget().hide()
+#                except:
+#                    pass
+#                layout.removeItem(w)
+#        self.buffers_layouts = []
+
+        for buf in self.all_buffers:
+            self.all_buffers[buf].hide()
+
+        while True:
+            w = self.lower_buffers_layout.takeAt(0)
+            if w == None:
+                break;
+            del w
+
+        while True:
+            w = self.upper_buffers_layout.takeAt(0)
+            if w == None:
+                break;
+            del w
+
+#        widgets = self.layout_widgets( self.lower_buffers_layout )
+#        for w in widgets:
+#            self.lower_buffers_layout.removeItem(w)
+#            del w
+#        widgets = self.layout_widgets( self.upper_buffers_layout )
+#        for w in widgets:
+#            self.upper_buffers_layout.removeItem(w)
+#            del w
 
     def __init__(self, plugin=None, name=None):
         """
@@ -111,6 +152,8 @@ class SubsystemWidget(QWidget):
         self.state = ''
         self.behavior = ''
 
+#        self.buffers_layouts = []
+        self.all_buffers = {}
         self.resetBuffersLayout()
 
 #        self.topics_tree_widget.sortByColumn(0, Qt.AscendingOrder)
@@ -263,18 +306,29 @@ class SubsystemWidget(QWidget):
 
         hbox1 = QHBoxLayout()
         hbox1.addStretch()
-        hbox1.addWidget(QLabel(common_name))
+        if not (common_name) in self.all_buffers:
+            self.all_buffers[common_name] = QLabel(common_name)
+        hbox1.addWidget(self.all_buffers[common_name])
+        self.all_buffers[common_name].show()
         hbox1.addStretch()
 
         hbox2 = QHBoxLayout()
+        hbox2.addSpacing(20)
         for buf_name in name_list:
-            hbox2.addStretch()
+#            hbox2.addStretch()
             if common_name+buf_name in lo_in or common_name+buf_name in up_out:
                 suffix = ' /\\'
             else:
                 suffix = ' \\/'
-            hbox2.addWidget(QPushButton(buf_name + suffix))
-        hbox2.addStretch()
+
+            if not (common_name+buf_name) in self.all_buffers:
+                self.all_buffers[common_name+buf_name] = QPushButton(buf_name + suffix)
+            hbox2.addWidget( self.all_buffers[common_name+buf_name] )
+            self.all_buffers[common_name+buf_name].show()
+#            hbox2.addWidget( QPushButton(buf_name + suffix) )
+#        hbox2.addStretch()
+        hbox2.addSpacing(20)
+
 
         if len(lo_in) > 0 or len(lo_out) > 0:
             vbox.addLayout(hbox1)
@@ -285,6 +339,9 @@ class SubsystemWidget(QWidget):
             vbox.addLayout(hbox2)
             vbox.addLayout(hbox1)
             self.upper_buffers_layout.addLayout(vbox)
+
+#        self.buffers_layouts.append(hbox1)
+#        self.buffers_layouts.append(hbox2)
 
     def getLowerSubsystemPosition(self, subsystem_name):
         for i in range(len(self.lower_subsystems)):

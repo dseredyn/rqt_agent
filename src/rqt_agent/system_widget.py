@@ -35,7 +35,7 @@ import os
 
 from python_qt_binding import loadUi
 from python_qt_binding.QtCore import Qt, QTimer, Signal, Slot
-from python_qt_binding.QtWidgets import QHeaderView, QMenu, QTreeWidgetItem, QWidget, QVBoxLayout, QLabel, QPushButton
+from python_qt_binding.QtWidgets import QHeaderView, QMenu, QTreeWidgetItem, QWidget, QVBoxLayout, QLabel, QPushButton, QHBoxLayout
 #from PyQt5 import QtCore, QtGui, QtWidgets
 import roslib
 import rospkg
@@ -105,15 +105,18 @@ class SystemWidget(QWidget):
 #        self._current_topic_list = []
         self._subsystems = {}
 
+        self.all_subsystems = {}
         self._widgets = {}
         self.prev_subsystems = []
-        
+        self.levels_layouts = []
 
         self.structure_root = None
         self.structure_graph = None
 
         self.structure_changed = False
 
+
+        print dir(self.verticalLayout)
 #        self._tree_items = {}
 #        self._column_index = {}
 #        for column_name in self._column_names:
@@ -193,11 +196,14 @@ class SystemWidget(QWidget):
 
         levels = []
         if root == None:
-            pass
-            # there are no subsystem
+            # there are no levels
+            one_level = []
+            for w_name in self._widgets:
+                one_level.append(w_name)
+            if len(one_level) > 0:
+                levels.append(one_level)
         else:
             levels.append([root])
-
             while True:
                 # expand all subsystems in the lowest level
                 current_lowest = levels[-1]
@@ -210,8 +216,14 @@ class SystemWidget(QWidget):
                 else:
                     levels.append(next_lower_level)
 
+            # TODO: manage disjoint trees
+
+
         print "levels:", levels
         return levels
+
+    def layout_widgets(self, layout):
+       return (layout.itemAt(i) for i in range(layout.count()))
 
     @Slot()
     def refresh_topics(self):
@@ -262,12 +274,15 @@ class SystemWidget(QWidget):
               msg.status[0].name == 'components' and msg.status[1].name == 'diagnostics':
                 name_split = subsystem_name.split('/')
 
+                if not subsystem_name in self.all_subsystems:
+                    self.all_subsystems[subsystem_name] = SubsystemWidget(self._plugin, subsystem_name)
+
                 if not subsystem_name in self._widgets:
-                    new_widgets[subsystem_name] = SubsystemWidget(self._plugin, subsystem_name)
-                    self.verticalLayout.addWidget(new_widgets[subsystem_name])
+                    new_widgets[subsystem_name] = self.all_subsystems[subsystem_name]
+#                    self.verticalLayout.addWidget(new_widgets[subsystem_name])
                 else:
                     new_widgets[subsystem_name] = self._widgets[subsystem_name]
-                    del self._widgets[subsystem_name]
+#                    del self._widgets[subsystem_name]
 
                 for value in msg.status[1].values:
                     if value.key == 'master_component':
@@ -277,35 +292,48 @@ class SystemWidget(QWidget):
 
         self._widgets = new_widgets
 
+#        print self._widgets.keys()
 
-        structure_change = self.checkStructureChange()
+        structure_changed = self.checkStructureChange()
 
-        if structure_change:
-            self.structure_change = True
+        if structure_changed:
+            self.structure_changed = True
 
-        if self.structure_change:
+        if self.structure_changed:
             allInitialized = True
             for subsystem_name in self._widgets:
                 if not self._widgets[subsystem_name].isInitialized():
                     allInitialized = False
                     break
             if allInitialized:
+                # remove all widgets from layouts
+                # and remove all layouts
+                for i in range(len(self.levels_layouts)):
+                    layout = self.levels_layouts[i]
+                    widgets = self.layout_widgets(layout)
+                    for w in widgets:
+                        if w == None or w.widget() == None:
+                            continue
+                        w.widget().hide()
+                        layout.removeWidget(w.widget())
+                    print "self.layout_widgets(layout):", self.layout_widgets(layout)
+                    self.verticalLayout.removeItem(layout)
+                    print "self.layout_widgets(self.verticalLayout):", self.layout_widgets(self.verticalLayout)
+                    del layout
+
+                self.levels_layouts = []
+
                 levels = self.generateStructure()
+                for l in levels:
+                    hbox = QHBoxLayout()
+                    for w in l:
+                        hbox.addWidget(self._widgets[w])
+                        self._widgets[w].show()
+                    self.levels_layouts.append(hbox)
+                    self.verticalLayout.addLayout(hbox)
+#                for 
                 # TODO
-                self.structure_change = False
-
-        #TODO: compare new structure with previous one and update the view (dictionary comparison)
-
-        structure_change = False    # TODO
-
-        if structure_change:
-            # remove all widgets from layout
-            for widget_name in self._widgets:
-                self.verticalLayout.removeWidget(self._widgets[widget_name])
-
-            # add all widgets to layout
-            for widget_name in self._widgets:
-                self.verticalLayout.addWidget(self._widgets[widget_name])
+                self.structure_changed = False
 
         for widget_name in self._widgets:
             self._widgets[widget_name].update_subsystem()
