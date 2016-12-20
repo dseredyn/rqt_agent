@@ -137,6 +137,8 @@ class SubsystemWidget(QWidget):
 
         self.components = {}
 
+        self.dot_graph = None
+
 #        self.topics_tree_widget.sortByColumn(0, Qt.AscendingOrder)
 #        header = self.topics_tree_widget.header()
 #        header.setResizeMode(QHeaderView.ResizeToContents)
@@ -178,6 +180,33 @@ class SubsystemWidget(QWidget):
                     else:
                         self.all_buffers[value.key[:-2]].setStyleSheet("background-color: red")
                     self.all_buffers[value.key[:-2]].setToolTip(value.value)
+
+        if self.dot_graph == None:
+            #
+            # read the dot graph from file
+            #
+            try:
+                with open('/tmp/' + self.subsystem_name + '.dot', 'r') as f:
+                    #self.dot_graph = f.readlines()
+                    self.dot_graph = f.read().splitlines()
+            except (IOError, OSError) as e:
+                print "caught exception: ", e
+
+            if self.dot_graph != None:
+                print "read dot graph, lines:", len(self.dot_graph)
+
+            # edit the graph
+            dot_box_str = '[shape=box,label="data"];'
+            #print dot_box_str
+            #print self.dot_graph[3][-len(dot_box_str):]
+            data_vertices = {}
+            for l in self.dot_graph:
+                if len(dot_box_str) < len(l) and l[-len(dot_box_str):] == dot_box_str:
+                    idx = l.find('"', 1)
+                    data_vertices[l[1:idx]] = []
+                    #print l[1:idx]
+
+            
 
         # iterate through components and add them to QListWidget
         for value in msg.status[0].values:
