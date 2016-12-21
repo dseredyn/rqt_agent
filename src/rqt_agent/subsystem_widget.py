@@ -33,6 +33,7 @@
 from __future__ import division
 import os
 import math
+import subprocess
 
 from python_qt_binding import loadUi
 from python_qt_binding.QtCore import Qt, QTimer, Signal, Slot, QRectF, QPointF
@@ -132,13 +133,20 @@ class MyDialog(QDialog):
         loadUi(ui_file, self)
 
         self.components_state = None
+        self.initialized = False
 
+        self.pushButton_close.clicked.connect(self.closeClick)
+        self.pushButton_zoom_in.clicked.connect(self.zoomInClick)
+        self.pushButton_zoom_out.clicked.connect(self.zoomOutClick)
+
+    def drawGraph(self, graph_file_name):
         self.graph = None
         try:
-            with open('/tmp/velma_core_cs_out.dot.plain', 'r') as f:
+            with open(graph_file_name, 'r') as f:
                 self.graph = f.read().splitlines()
         except (IOError, OSError) as e:
             print "caught exception: ", e
+            return
 
         header = self.graph[0].split()
         if header[0] != 'graph':
@@ -178,7 +186,7 @@ class MyDialog(QDialog):
                 # edge CImp Ts 4 16.068 5.159 15.143 4.9826 12.876 4.5503 11.87 4.3583 solid black
                 line_len = int(items[3])
                 if (line_len * 2 + 6) != len(items):
-                    raise Exception('wrong number of items in line', 'should be: ' + (line_len * 2 + 6) + ', line is: ' + l)
+                    raise Exception('wrong number of items in line', 'should be: ' + str(line_len * 2 + 6) + ', line is: ' + l)
                 line = []
                 for i in range(line_len):
                     line.append( (self.tfX(items[4+i*2]), self.tfY(items[5+i*2])) )
@@ -216,10 +224,7 @@ class MyDialog(QDialog):
 
 
         self.graphicsView.setScene(self.scene)
-
-        self.pushButton_close.clicked.connect(self.closeClick)
-        self.pushButton_zoom_in.clicked.connect(self.zoomInClick)
-        self.pushButton_zoom_out.clicked.connect(self.zoomOutClick)
+        self.initialized = True
 
     @Slot()
     def closeClick(self):
@@ -227,15 +232,24 @@ class MyDialog(QDialog):
 
     @Slot()
     def zoomInClick(self):
+        if not self.initialized:
+            return
+
         scaleFactor = 1.1
         self.graphicsView.scale(scaleFactor, scaleFactor)
 
     @Slot()
     def zoomOutClick(self):
+        if not self.initialized:
+            return
+
         scaleFactor = 1.0/1.1
         self.graphicsView.scale(scaleFactor, scaleFactor)
 
     def updateState(self, components_state):
+        if not self.initialized:
+            return
+
         changed = False
         if self.components_state == None:
             changed = True
@@ -483,6 +497,7 @@ class SubsystemWidget(QWidget):
                     options_str = '[' + options_str + ']'
                 else:
                     options_str = ''
+
                 lines.append(e[0] + '->' + e[1] + options_str + ';\n')
             lines.append('}\n')
             return lines
@@ -503,6 +518,7 @@ class SubsystemWidget(QWidget):
             #
             # read the dot graph from file
             #
+            dot_graph = None
             try:
                 with open('/tmp/' + self.subsystem_name + '.dot', 'r') as f:
                     dot_graph = f.read().splitlines()
@@ -518,7 +534,7 @@ class SubsystemWidget(QWidget):
                 new_graph = self.Graph()
                 data_edges = {}
                 for v in self.graph.vertices:
-                    if v[1].shape == 'box' and v[1].label=='"data"':
+                    if v[1].shape == 'box':# and v[1].label=='"data"':
                         data_edges[v[0]] = [None, None]
                     else:
                         new_graph.vertices.append(v)
@@ -530,6 +546,8 @@ class SubsystemWidget(QWidget):
                     else:
                         new_graph.edges.append( e )
                 for label in data_edges:
+                    if data_edges[label][0] == None or data_edges[label][1] == None:
+                        continue
                     options = self.Graph.Options()
                     options.label = None #label     # these labels are looong
                     new_graph.edges.append( (data_edges[label][0], data_edges[label][1], options) )
@@ -571,6 +589,9 @@ class SubsystemWidget(QWidget):
 
                 with open('/tmp/' + self.subsystem_name + '_out.dot', 'w') as f:
                     f.writelines( self.graph.toStr() )
+
+                subprocess.call(['dot', '-Tplain', '-O', '/tmp/' + self.subsystem_name + '_out.dot'])
+                self.dialogGraph.drawGraph('/tmp/' + self.subsystem_name + '_out.dot.plain')
 
         # iterate through components and add them to QListWidget
         for value in msg.status[0].values:
@@ -761,41 +782,6 @@ class SubsystemWidget(QWidget):
         """
         This method needs to be called to start updating topic pane.
         """
-
-    def update_value(self, topic_name, message):
-        if hasattr(message, '__slots__') and hasattr(message, '_slot_types'):
-            for slot_name in message.__slots__:
-                self.update_value(topic_name + '/' + slot_name, getattr(message, slot_name))
-
-        elif type(message) in (list, tuple) and (len(message) > 0) and hasattr(message[0], '__slots__'):
-
-            for index, slot in enumerate(message):
-                if topic_name + '[%d]' % index in self._tree_items:
-                    self.update_value(topic_name + '[%d]' % index, slot)
-                else:
-                    base_type_str, _ = self._extract_array_info(self._tree_items[topic_name].text(self._column_index['type']))
-                    self._recursive_create_widget_items(self._tree_items[topic_name], topic_name + '[%d]' % index, base_type_str, slot)
-            # remove obsolete children
-            if len(message) < self._tree_items[topic_name].childCount():
-                for i in range(len(message), self._tree_items[topic_name].childCount()):
-                    item_topic_name = topic_name + '[%d]' % i
-                    self._recursive_delete_widget_items(self._tree_items[item_topic_name])
-        else:
-            if topic_name in self._tree_items:
-                self._tree_items[topic_name].setText(self._column_index['value'], repr(message))
-
-    def _extract_array_info(self, type_str):
-        array_size = None
-        if '[' in type_str and type_str[-1] == ']':
-            type_str, array_size_str = type_str.split('[', 1)
-            array_size_str = array_size_str[:-1]
-            if len(array_size_str) > 0:
-                array_size = int(array_size_str)
-            else:
-                array_size = 0
-
-        return type_str, array_size
-
 
     def shutdown_plugin(self):
         for topic in self._topics.values():
