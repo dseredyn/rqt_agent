@@ -82,15 +82,6 @@ class SystemWidget(QWidget):
         ui_file = os.path.join(rp.get_path('rqt_agent'), 'resource', 'SystemWidget.ui')
         loadUi(ui_file, self)
 
-#        btn = QPushButton('Nacisnij mnie Agnieszko')
-#        cpt = QLabel()
-#        @Slot()
-#        def on_click():
-#            cpt.setText("KOCHAM CIE!")
-#        btn.clicked.connect(on_click)
-#        self.verticalLayout.addWidget(btn)
-#        self.verticalLayout.addWidget(cpt)
-
         self._plugin = plugin
 #        self.topics_tree_widget.sortByColumn(0, Qt.AscendingOrder)
 #        header = self.topics_tree_widget.header()

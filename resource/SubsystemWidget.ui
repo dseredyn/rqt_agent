@@ -132,6 +132,14 @@
            </widget>
           </item>
           <item>
+           <widget class="QPushButton" name="showGraph">
+            <property name="text">
+             <string>Show Transition
+Function</string>
+            </property>
+           </widget>
+          </item>
+          <item>
            <spacer name="verticalSpacer">
             <property name="orientation">
              <enum>Qt::Vertical</enum>
