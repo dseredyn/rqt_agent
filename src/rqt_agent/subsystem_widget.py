@@ -262,7 +262,8 @@ class MyDialog(QDialog):
         if changed:
             self.components_state = components_state
             for comp_name in self.nodes:
-                self.nodes[comp_name].setBrush(getComponentBrush(self.components_state[comp_name]))
+                if comp_name in self.components_state:
+                    self.nodes[comp_name].setBrush(getComponentBrush(self.components_state[comp_name]))
 
 #    def wheelEvent(self, event):
 #        print dir(event)
@@ -454,6 +455,7 @@ class SubsystemWidget(QWidget):
         def clear(self):
             self.edges = []
             self.vertices = []
+            self.ranks = []
 
         def parseDot(self, dot_graph):
             self.clear()
@@ -499,8 +501,22 @@ class SubsystemWidget(QWidget):
                     options_str = ''
 
                 lines.append(e[0] + '->' + e[1] + options_str + ';\n')
+
+            for rank in self.ranks:
+                lines.append(rank)
             lines.append('}\n')
             return lines
+
+        def addRank(self, name_list, rank_type='same'):
+            if name_list == None or len(name_list) == 0:
+                return
+
+            rank_line = "{ rank=" + rank_type + "; "
+            for name in name_list:
+                rank_line = rank_line + ' "' + name + '"'
+            rank_line = rank_line + ' }\n'
+
+            self.ranks.append(rank_line)
 
     def update_subsystem(self, msg):
         for value in msg.status[1].values:
@@ -514,7 +530,7 @@ class SubsystemWidget(QWidget):
                         self.all_buffers[value.key[:-2]].setStyleSheet("background-color: red")
                     self.all_buffers[value.key[:-2]].setToolTip(value.value)
 
-        if self.graph == None:
+        if self.graph == None and self.initialized:
             #
             # read the dot graph from file
             #
@@ -554,10 +570,12 @@ class SubsystemWidget(QWidget):
 
                 self.graph = new_graph
 
-                # remove unconnected edges
+                # remove unconnected edges and "graph_component", "scheme" and "diag"
                 new_graph = self.Graph()
                 data_edges = []
                 for v in self.graph.vertices:
+                    if v[0] == '"scheme"' or v[0] == '"graph_component"' or v[0] == '"diag"':
+                        continue
                     if v[1].shape == 'point':
                         data_edges.append(v[0])
                     else:
@@ -584,6 +602,48 @@ class SubsystemWidget(QWidget):
                     if not edge in data_edges:
                         new_graph.edges.append( e )
                         data_edges.add(edge)
+
+                lower_buffers_rx_tx = []
+                lower_buffers_s_c = []
+                upper_buffers_rx_tx = []
+                upper_buffers_s_c = []
+
+                lower_buffers_rx_tx_rank = 'same'
+                upper_buffers_rx_tx_rank = 'same'
+                for i in range(len(self.buffer_info.lower_inputs)):
+                    if self.buffer_info.lower_inputs_ipc[i]:
+                        lower_buffers_rx_tx.append(self.buffer_info.lower_inputs[i] + "Rx")
+                        lower_buffers_rx_tx_rank = 'sink'
+                    else:
+                        lower_buffers_rx_tx.append(self.buffer_info.lower_inputs[i] + "Concate")
+                    lower_buffers_s_c.append(self.buffer_info.lower_inputs[i] + "Split")
+                for i in range(len(self.buffer_info.lower_outputs)):
+                    if self.buffer_info.lower_outputs_ipc[i]:
+                        lower_buffers_rx_tx.append(self.buffer_info.lower_outputs[i] + "Tx")
+                        lower_buffers_rx_tx_rank = 'sink'
+                    else:
+                        lower_buffers_rx_tx.append(self.buffer_info.lower_outputs[i] + "Split")
+                    lower_buffers_s_c.append(self.buffer_info.lower_outputs[i] + "Concate")
+
+                for i in range(len(self.buffer_info.upper_inputs)):
+                    if self.buffer_info.upper_inputs_ipc[i]:
+                        upper_buffers_rx_tx.append(self.buffer_info.upper_inputs[i] + "Rx")
+                        upper_buffers_rx_tx_rank = 'source'
+                    else:
+                        upper_buffers_rx_tx.append(self.buffer_info.upper_inputs[i] + "Concate")
+                    upper_buffers_s_c.append(self.buffer_info.upper_inputs[i] + "Split")
+                for i in range(len(self.buffer_info.upper_outputs)):
+                    if self.buffer_info.upper_outputs_ipc[i]:
+                        upper_buffers_rx_tx.append(self.buffer_info.upper_outputs[i] + "Tx")
+                        upper_buffers_rx_tx_rank = 'source'
+                    else:
+                        upper_buffers_rx_tx.append(self.buffer_info.upper_outputs[i] + "Split")
+                    upper_buffers_s_c.append(self.buffer_info.upper_outputs[i] + "Concate")
+
+                new_graph.addRank(upper_buffers_rx_tx, rank_type=upper_buffers_rx_tx_rank)
+                new_graph.addRank(upper_buffers_s_c)
+                new_graph.addRank(lower_buffers_s_c)
+                new_graph.addRank(lower_buffers_rx_tx, rank_type=lower_buffers_rx_tx_rank)
 
                 self.graph = new_graph
 
