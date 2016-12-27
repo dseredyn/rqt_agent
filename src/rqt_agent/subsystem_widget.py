@@ -603,47 +603,85 @@ class SubsystemWidget(QWidget):
                         new_graph.edges.append( e )
                         data_edges.add(edge)
 
-                lower_buffers_rx_tx = []
-                lower_buffers_s_c = []
-                upper_buffers_rx_tx = []
-                upper_buffers_s_c = []
+                # draw inputs on the top and outputs at the bottom
+                if False:
+                    lower_buffers_rx_tx = []
+                    lower_buffers_s_c = []
+                    upper_buffers_rx_tx = []
+                    upper_buffers_s_c = []
 
-                lower_buffers_rx_tx_rank = 'same'
-                upper_buffers_rx_tx_rank = 'same'
-                for i in range(len(self.buffer_info.lower_inputs)):
-                    if self.buffer_info.lower_inputs_ipc[i]:
-                        lower_buffers_rx_tx.append(self.buffer_info.lower_inputs[i] + "Rx")
-                        lower_buffers_rx_tx_rank = 'sink'
-                    else:
-                        lower_buffers_rx_tx.append(self.buffer_info.lower_inputs[i] + "Concate")
-                    lower_buffers_s_c.append(self.buffer_info.lower_inputs[i] + "Split")
-                for i in range(len(self.buffer_info.lower_outputs)):
-                    if self.buffer_info.lower_outputs_ipc[i]:
-                        lower_buffers_rx_tx.append(self.buffer_info.lower_outputs[i] + "Tx")
-                        lower_buffers_rx_tx_rank = 'sink'
-                    else:
-                        lower_buffers_rx_tx.append(self.buffer_info.lower_outputs[i] + "Split")
-                    lower_buffers_s_c.append(self.buffer_info.lower_outputs[i] + "Concate")
+                    lower_buffers_rx_tx_rank = 'same'
+                    upper_buffers_rx_tx_rank = 'same'
+                    for i in range(len(self.buffer_info.lower_inputs)):
+                        if self.buffer_info.lower_inputs_ipc[i]:
+                            lower_buffers_rx_tx.append(self.buffer_info.lower_inputs[i] + "Rx")
+                            lower_buffers_rx_tx_rank = 'sink'
+                        else:
+                            lower_buffers_rx_tx.append(self.buffer_info.lower_inputs[i] + "Concate")
+                        lower_buffers_s_c.append(self.buffer_info.lower_inputs[i] + "Split")
+                    for i in range(len(self.buffer_info.lower_outputs)):
+                        if self.buffer_info.lower_outputs_ipc[i]:
+                            lower_buffers_rx_tx.append(self.buffer_info.lower_outputs[i] + "Tx")
+                            lower_buffers_rx_tx_rank = 'sink'
+                        else:
+                            lower_buffers_rx_tx.append(self.buffer_info.lower_outputs[i] + "Split")
+                        lower_buffers_s_c.append(self.buffer_info.lower_outputs[i] + "Concate")
 
-                for i in range(len(self.buffer_info.upper_inputs)):
-                    if self.buffer_info.upper_inputs_ipc[i]:
-                        upper_buffers_rx_tx.append(self.buffer_info.upper_inputs[i] + "Rx")
-                        upper_buffers_rx_tx_rank = 'source'
-                    else:
-                        upper_buffers_rx_tx.append(self.buffer_info.upper_inputs[i] + "Concate")
-                    upper_buffers_s_c.append(self.buffer_info.upper_inputs[i] + "Split")
-                for i in range(len(self.buffer_info.upper_outputs)):
-                    if self.buffer_info.upper_outputs_ipc[i]:
-                        upper_buffers_rx_tx.append(self.buffer_info.upper_outputs[i] + "Tx")
-                        upper_buffers_rx_tx_rank = 'source'
-                    else:
-                        upper_buffers_rx_tx.append(self.buffer_info.upper_outputs[i] + "Split")
-                    upper_buffers_s_c.append(self.buffer_info.upper_outputs[i] + "Concate")
+                    for i in range(len(self.buffer_info.upper_inputs)):
+                        if self.buffer_info.upper_inputs_ipc[i]:
+                            upper_buffers_rx_tx.append(self.buffer_info.upper_inputs[i] + "Rx")
+                            upper_buffers_rx_tx_rank = 'source'
+                        else:
+                            upper_buffers_rx_tx.append(self.buffer_info.upper_inputs[i] + "Concate")
+                        upper_buffers_s_c.append(self.buffer_info.upper_inputs[i] + "Split")
+                    for i in range(len(self.buffer_info.upper_outputs)):
+                        if self.buffer_info.upper_outputs_ipc[i]:
+                            upper_buffers_rx_tx.append(self.buffer_info.upper_outputs[i] + "Tx")
+                            upper_buffers_rx_tx_rank = 'source'
+                        else:
+                            upper_buffers_rx_tx.append(self.buffer_info.upper_outputs[i] + "Split")
+                        upper_buffers_s_c.append(self.buffer_info.upper_outputs[i] + "Concate")
 
-                new_graph.addRank(upper_buffers_rx_tx, rank_type=upper_buffers_rx_tx_rank)
-                new_graph.addRank(upper_buffers_s_c)
-                new_graph.addRank(lower_buffers_s_c)
-                new_graph.addRank(lower_buffers_rx_tx, rank_type=lower_buffers_rx_tx_rank)
+                    new_graph.addRank(upper_buffers_rx_tx, rank_type=upper_buffers_rx_tx_rank)
+                    new_graph.addRank(upper_buffers_s_c)
+                    new_graph.addRank(lower_buffers_s_c)
+                    new_graph.addRank(lower_buffers_rx_tx, rank_type=lower_buffers_rx_tx_rank)
+                else:
+                    buffers_rx = []
+                    buffers_s = []
+                    buffers_tx = []
+                    buffers_c = []
+
+                    buffers_rx_rank = 'same'
+                    buffers_tx_rank = 'same'
+                    for i in range(len(self.buffer_info.lower_inputs)):
+                        if self.buffer_info.lower_inputs_ipc[i]:
+                            buffers_rx.append(self.buffer_info.lower_inputs[i] + "Rx")
+                            buffers_rx_rank = 'source'
+                        buffers_s.append(self.buffer_info.lower_inputs[i] + "Split")
+
+                    for i in range(len(self.buffer_info.upper_inputs)):
+                        if self.buffer_info.upper_inputs_ipc[i]:
+                            buffers_rx.append(self.buffer_info.upper_inputs[i] + "Rx")
+                            buffers_rx_rank = 'source'
+                        buffers_s.append(self.buffer_info.upper_inputs[i] + "Split")
+
+
+                    for i in range(len(self.buffer_info.lower_outputs)):
+                        if self.buffer_info.lower_outputs_ipc[i]:
+                            buffers_tx.append(self.buffer_info.lower_outputs[i] + "Tx")
+                            buffers_tx_rank = 'sink'
+                        buffers_c.append(self.buffer_info.lower_outputs[i] + "Concate")
+                    for i in range(len(self.buffer_info.upper_outputs)):
+                        if self.buffer_info.upper_outputs_ipc[i]:
+                            buffers_tx.append(self.buffer_info.upper_outputs[i] + "Tx")
+                            buffers_tx_rank = 'sink'
+                        buffers_c.append(self.buffer_info.upper_outputs[i] + "Concate")
+
+                    new_graph.addRank(buffers_rx, rank_type=buffers_rx_rank)
+                    new_graph.addRank(buffers_s)
+                    new_graph.addRank(buffers_c)
+                    new_graph.addRank(buffers_tx, rank_type=buffers_tx_rank)
 
                 self.graph = new_graph
 

@@ -35,7 +35,7 @@ import os
 
 from python_qt_binding import loadUi
 from python_qt_binding.QtCore import Qt, QTimer, Signal, Slot
-from python_qt_binding.QtWidgets import QHeaderView, QMenu, QTreeWidgetItem, QWidget, QVBoxLayout, QLabel, QPushButton, QHBoxLayout
+from python_qt_binding.QtWidgets import QHeaderView, QMenu, QTreeWidgetItem, QWidget, QVBoxLayout, QLabel, QPushButton, QHBoxLayout, QScrollArea
 #from PyQt5 import QtCore, QtGui, QtWidgets
 import roslib
 import rospkg
@@ -73,8 +73,6 @@ class SystemWidget(QWidget):
         super(SystemWidget, self).__init__()
 
 #        levels_layout = QVBoxLayout()
-        nameLabel = QLabel("Name:")
-#        levels_layout.addWidget(nameLabel)
 
 #        self._select_topic_type = select_topic_type
 
@@ -106,6 +104,13 @@ class SystemWidget(QWidget):
 
         self.structure_changed = False
 
+        self.scrollArea = QScrollArea()
+        self.scrollArea.setWidgetResizable( True );
+        self.horizontalLayout.addWidget(self.scrollArea)
+        self.mainWidget = QWidget()
+        self.scrollArea.setWidget(self.mainWidget)
+        self.verticalLayout = QVBoxLayout()
+        self.mainWidget.setLayout(self.verticalLayout)
 
 #        self._tree_items = {}
 #        self._column_index = {}
