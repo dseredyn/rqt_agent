@@ -37,8 +37,8 @@ import subprocess
 
 from python_qt_binding import loadUi
 from python_qt_binding.QtCore import Qt, QTimer, Signal, Slot, QRectF, QPointF
-from python_qt_binding.QtWidgets import QWidget, QPushButton, QVBoxLayout, QHBoxLayout, QLabel, QListWidgetItem, QDialog, QGraphicsView, QGraphicsScene
-from python_qt_binding.QtGui import QColor, QBrush, QPainterPath, QPolygonF, QTransform
+from python_qt_binding.QtWidgets import QWidget, QPushButton, QVBoxLayout, QHBoxLayout, QLabel, QListWidgetItem, QDialog, QGraphicsView, QGraphicsScene, QGraphicsEllipseItem, QGraphicsPathItem
+from python_qt_binding.QtGui import QColor, QPen, QBrush, QPainterPath, QPolygonF, QTransform
 import roslib
 import rospkg
 import rospy
@@ -76,6 +76,84 @@ def getComponentTooltip(state):
         tooltip = 'exception'
     return tooltip
 
+class GraphScene(QGraphicsScene):
+    def __init__(self, rect):
+        super(GraphScene, self).__init__(rect)
+
+class GraphView(QGraphicsView):
+
+    comp_select_signal = Signal(str)
+
+    def __init__ (self, parent = None):
+        super (GraphView, self).__init__ (parent)
+        self.parent = parent
+        self.transform_press = None
+        self.mousePressPos = None
+        self.setTransformationAnchor(QGraphicsView.NoAnchor)
+        self.setResizeAnchor(QGraphicsView.NoAnchor)
+
+    def isPanActive(self):
+        return (self.transform_press != None and self.mousePressPos != None)
+
+    def wheelEvent (self, event):
+        if self.isPanActive():
+            return
+
+        oldPos = self.mapToScene(event.pos())
+        self.translate(oldPos.x(),oldPos.y())
+
+        factor = 1.2
+        if event.angleDelta().y() < 0 :
+            factor = 1.0 / factor
+        self.scale(factor, factor)
+
+        # Get the new position
+        newPos = self.mapToScene(event.pos())
+        # Move scene to old position
+        delta = newPos - oldPos
+        self.translate(delta.x(), delta.y())
+
+    def selectComponent(self, name):
+#        print "selected component: ", name
+        self.comp_select_signal.emit(name)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MidButton:
+            self.transform_press = self.transform()
+            self.mousePressPos = event.pos()
+        else:
+            super(GraphView, self).mousePressEvent(event)
+            selected = False
+            for item in self.items():
+                if type(item) is QGraphicsEllipseItem:
+                    if item.contains( self.mapToScene(event.pos()) ):
+                        self.selectComponent(item.data(0))
+                        selected = True
+                        break
+                elif type(item) is QGraphicsPathItem:
+                    if item.contains( self.mapToScene(event.pos()) ):
+                        print "connections: ", item.data(0)
+            if not selected:
+                self.selectComponent(None)
+
+    def mouseMoveEvent(self, event):
+        if event.buttons() == Qt.MidButton:
+            mouseMovePos = event.pos()
+            view_diff = (mouseMovePos - self.mousePressPos)
+            tf = self.transform_press
+            scene_diff = view_diff
+            new_tf = QTransform(tf.m11(), tf.m12(), tf.m21(), tf.m22(), tf.dx()+view_diff.x(), tf.dy()+view_diff.y())
+            self.setTransform(new_tf)
+        else:
+            super(GraphView, self).mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.MidButton:
+            self.transform_press = None
+            self.mousePressPos = None
+        else:
+            super(GraphView, self).mouseReleaseEvent(event)
+
 class MyDialog(QDialog):
 
     def scX(self, x):
@@ -90,43 +168,65 @@ class MyDialog(QDialog):
     def tfY(self, y):
         return self.scale_factor * (self.height - float(y))
 
-# unused
-#    def interpolate(self, points,  scale):
-#        control_points = []
-#        if len(points) < 2:
-#            return None
-#        for i in range(len(points)):
-#            if i == 0:
-#                p1 = points[i]
-#                p2 = points[i + 1]
-#                tangent = (p2[0] - p1[0], p2[1] - p1[1])
-#                q1 = (p1[0] + scale * tangent[0], p1[1] + scale * tangent[1])
-#                control_points.append(q1);
-#            elif i == len(points)-1:
-#                p0 = points[i - 1]
-#                p1 = points[i]
-#                tangent = (p1[0] - p0[0], p1[1] - p0[1])
-#                q0 = (p1[0] - scale * tangent[0], p1[1] - scale * tangent[1])
-#                control_points.append(q0)
-#            else:
-#                p0 = points[i - 1]
-#                p1 = points[i]
-#                p2 = points[i + 1]
-#                tangent = (p2[0] - p0[0], p2[1] - p0[1])
-#                tangent_norm = math.sqrt(tangent[0]*tangent[0] + tangent[1]*tangent[1])
-#                print tangent_norm
-#                if tangent_norm > 0:
-#                    tangent = (tangent[0]/tangent_norm, tangent[1]/tangent_norm)
-#                p1_p0_magnitude = math.sqrt((p1[0] - p0[0])*(p1[0] - p0[0]) + (p1[1] - p0[1])*(p1[1] - p0[1]))
-#                p2_p1_magnitude = math.sqrt((p2[0] - p1[0])*(p2[0] - p1[0]) + (p2[1] - p1[1])*(p2[1] - p1[1]))
-#                q0 = (p1[0] - scale * tangent[0] * p1_p0_magnitude, p1[1] - scale * tangent[1] * p1_p0_magnitude)
-#                q1 = (p1[0] + scale * tangent[0] * p2_p1_magnitude, p1[1] + scale * tangent[1] * p2_p1_magnitude)
-#                control_points.append(q0)
-#                control_points.append(q1)
-#        return control_points
+    @Slot(int)
+    def portSelected(self, index):
+        for e in self.prev_selected_connections:
+            e.setPen( QPen(QBrush(QColor(0,0,0)), 0) )
+        self.prev_selected_connections = []
+
+        if not self.component_selected:
+            return
+
+        for conn in self.parent.all_connections:
+            if (conn[0] == self.component_selected and conn[1] == self.selected_component_port_names[index]) or \
+                (conn[2] == self.component_selected and conn[3] == self.selected_component_port_names[index]):
+                for e in self.edges:
+                    data = e.data(0)
+                    if (data[0] == conn[0] and data[1] == conn[2]) or \
+                        (data[0] == conn[2] and data[1] == conn[0]):
+                        e.setPen( QPen(QBrush(QColor(255,0,0)), 5) )
+                        self.prev_selected_connections.append(e)
+
+    @Slot(str)
+    def componentSelected(self, name):
+        self.comboBoxConnections.clear()
+        self.component_selected = name
+
+        if name == None:
+            self.labelSelectedComponent.setText('')
+            return
+
+        self.labelSelectedComponent.setText(name)
+        for comp in self.parent.subsystem_info.components:
+            if comp.name == name:
+                self.selected_component_port_names = []
+                for p in comp.ports:
+                    self.selected_component_port_names.append(p.name)
+                    port_str = ''
+                    if p.is_input:
+                        port_str += '[IN]'
+                    else:
+                        port_str += '[OUT]'
+                    port_str += ' ' + p.name
+                    if p.is_connected:
+                        port_str += ' <conncected>'
+                    else:
+                        port_str += ' <not conncected>'
+                    type_str = ''
+                    for tn in p.type_names:
+                        type_str += ' ' + tn
+                    if len(type_str) == 0:
+                        type_str = 'unknown type'
+                    port_str += ', type:' + type_str
+                    self.comboBoxConnections.addItem(port_str)
+                break
 
     def __init__(self, parent=None):
         super(MyDialog, self).__init__(parent)
+
+        self.parent = parent
+
+        self.setWindowFlags(Qt.Window)
 
         rp = rospkg.RosPack()
         ui_file = os.path.join(rp.get_path('rqt_agent'), 'resource', 'GraphVis.ui')
@@ -138,6 +238,11 @@ class MyDialog(QDialog):
         self.pushButton_close.clicked.connect(self.closeClick)
         self.pushButton_zoom_in.clicked.connect(self.zoomInClick)
         self.pushButton_zoom_out.clicked.connect(self.zoomOutClick)
+
+        self.prev_selected_connections = []
+        self.comboBoxConnections.highlighted.connect(self.portSelected)
+
+        self.componentSelected(None)
 
     def drawGraph(self, graph_file_name):
         self.graph = None
@@ -157,9 +262,10 @@ class MyDialog(QDialog):
         self.height = float(header[3])
         print "QGraphicsScene size:", self.width, self.height
 
-        self.scene = QGraphicsScene(QRectF(0, 0, self.scX(self.width), self.scY(self.height)))
+        self.scene = GraphScene(QRectF(0, 0, self.scX(self.width), self.scY(self.height)))
 
         self.nodes = {}
+        self.edges = []
 
         for l in self.graph:
             items = l.split()
@@ -178,6 +284,7 @@ class MyDialog(QDialog):
                 y = self.tfY(items[3])
 
                 self.nodes[name] = self.scene.addEllipse(x - w/2, y - h/2, w, h)
+                self.nodes[name].setData(0, name)
                 text_item = self.scene.addSimpleText(name)
                 br = text_item.boundingRect()
                 text_item.setPos(x - br.width()/2, y - br.height()/2)
@@ -201,7 +308,9 @@ class MyDialog(QDialog):
                     control_points_idx = control_points_idx + 3
                     if control_points_idx >= len(line):
                         break
-                self.scene.addPath(path)
+                edge = self.scene.addPath(path)
+                edge.setData(0, (items[1], items[2]))
+                self.edges.append(edge)
 
                 end_p = QPointF(line[-1][0], line[-1][1])
                 p0 = end_p - QPointF(line[-2][0], line[-2][1])
@@ -222,8 +331,12 @@ class MyDialog(QDialog):
 #                painter = QPainter()
                 self.scene.addPolygon(poly)
 
-
+        self.graphicsView = GraphView()
+        self.verticalLayout.insertWidget(0, self.graphicsView)
         self.graphicsView.setScene(self.scene)
+
+        self.graphicsView.comp_select_signal.connect(self.componentSelected)
+
         self.initialized = True
 
     @Slot()
@@ -369,7 +482,7 @@ class SubsystemWidget(QWidget):
 
         self.subsystem_name = name
 
-        self.buffer_info = None
+        self.subsystem_info = None
         self.state = ''
         self.behavior = ''
 
@@ -518,6 +631,45 @@ class SubsystemWidget(QWidget):
 
             self.ranks.append(rank_line)
 
+    def extractConnectionInfo(self, conn, comp_from, comp_to):
+        if (not comp_to) or (not comp_from):
+            print 'WARNING: wrong edge(1): ', conn, comp_from, comp_to
+            return None
+
+        if conn.find(comp_from.name) != 0:
+            print 'WARNING: wrong edge(2): ', conn, comp_from.name, comp_to.name
+            return None
+
+        idx = len(comp_from.name)
+        port_from = None
+        for p in comp_from.ports:
+            if conn.find(p.name, idx) == idx:
+                port_from = p.name
+                idx += len(p.name)
+                break
+
+        if not port_from:
+            print 'WARNING: wrong edge(3): ', conn, comp_from.name, comp_to.name
+            return None
+
+        if conn.find(comp_to.name, idx) != idx:
+            print 'WARNING: wrong edge(4): ', conn, comp_from.name, comp_to.name
+
+        idx += len(comp_to.name)
+
+        port_to = None
+        for p in comp_to.ports:
+            if conn.find(p.name, idx) == idx:
+                port_to = p.name
+                idx += len(p.name)
+                break
+
+        if not port_to:
+            print 'WARNING: wrong edge(5): ', conn, comp_from.name, comp_to.name
+            return None
+
+        return (comp_from.name, port_from, comp_to.name, port_to)
+
     def update_subsystem(self, msg):
         for value in msg.status[1].values:
             if value.key == 'master_component':
@@ -568,6 +720,38 @@ class SubsystemWidget(QWidget):
                     options.label = None #label     # these labels are looong
                     new_graph.edges.append( (data_edges[label][0], data_edges[label][1], options) )
 
+                # save all connections
+                self.all_connections = []
+
+
+                for conn in data_edges:
+                    edge_from = data_edges[conn][0]
+                    edge_to = data_edges[conn][1]
+
+                    if (not edge_from) or (not edge_to):
+                        continue
+
+                    edge_name = conn.strip('"')
+                    edge_from = edge_from.strip('"')
+                    edge_to = edge_to.strip('"')
+
+                    comp_from = None
+                    comp_to = None
+                    for comp in self.subsystem_info.components:
+                        if comp.name == edge_from:
+                            comp_from = comp
+                            if comp_to:
+                                break
+                        if comp.name == edge_to:
+                            comp_to = comp
+                            if comp_from:
+                                break
+#                    print edge_from, edge_to, edge_name
+                    conn_info = self.extractConnectionInfo(edge_name, comp_from, comp_to)
+                    if conn_info:
+                        self.all_connections.append(conn_info)
+# TODO
+
                 self.graph = new_graph
 
                 # remove unconnected edges and "graph_component", "scheme" and "diag"
@@ -612,35 +796,35 @@ class SubsystemWidget(QWidget):
 
                     lower_buffers_rx_tx_rank = 'same'
                     upper_buffers_rx_tx_rank = 'same'
-                    for i in range(len(self.buffer_info.lower_inputs)):
-                        if self.buffer_info.lower_inputs_ipc[i]:
-                            lower_buffers_rx_tx.append(self.buffer_info.lower_inputs[i] + "Rx")
+                    for i in range(len(self.subsystem_info.lower_inputs)):
+                        if self.subsystem_info.lower_inputs_ipc[i]:
+                            lower_buffers_rx_tx.append(self.subsystem_info.lower_inputs[i] + "Rx")
                             lower_buffers_rx_tx_rank = 'sink'
                         else:
-                            lower_buffers_rx_tx.append(self.buffer_info.lower_inputs[i] + "Concate")
-                        lower_buffers_s_c.append(self.buffer_info.lower_inputs[i] + "Split")
-                    for i in range(len(self.buffer_info.lower_outputs)):
-                        if self.buffer_info.lower_outputs_ipc[i]:
-                            lower_buffers_rx_tx.append(self.buffer_info.lower_outputs[i] + "Tx")
+                            lower_buffers_rx_tx.append(self.subsystem_info.lower_inputs[i] + "Concate")
+                        lower_buffers_s_c.append(self.subsystem_info.lower_inputs[i] + "Split")
+                    for i in range(len(self.subsystem_info.lower_outputs)):
+                        if self.subsystem_info.lower_outputs_ipc[i]:
+                            lower_buffers_rx_tx.append(self.subsystem_info.lower_outputs[i] + "Tx")
                             lower_buffers_rx_tx_rank = 'sink'
                         else:
-                            lower_buffers_rx_tx.append(self.buffer_info.lower_outputs[i] + "Split")
-                        lower_buffers_s_c.append(self.buffer_info.lower_outputs[i] + "Concate")
+                            lower_buffers_rx_tx.append(self.subsystem_info.lower_outputs[i] + "Split")
+                        lower_buffers_s_c.append(self.subsystem_info.lower_outputs[i] + "Concate")
 
-                    for i in range(len(self.buffer_info.upper_inputs)):
-                        if self.buffer_info.upper_inputs_ipc[i]:
-                            upper_buffers_rx_tx.append(self.buffer_info.upper_inputs[i] + "Rx")
+                    for i in range(len(self.subsystem_info.upper_inputs)):
+                        if self.subsystem_info.upper_inputs_ipc[i]:
+                            upper_buffers_rx_tx.append(self.subsystem_info.upper_inputs[i] + "Rx")
                             upper_buffers_rx_tx_rank = 'source'
                         else:
-                            upper_buffers_rx_tx.append(self.buffer_info.upper_inputs[i] + "Concate")
-                        upper_buffers_s_c.append(self.buffer_info.upper_inputs[i] + "Split")
-                    for i in range(len(self.buffer_info.upper_outputs)):
-                        if self.buffer_info.upper_outputs_ipc[i]:
-                            upper_buffers_rx_tx.append(self.buffer_info.upper_outputs[i] + "Tx")
+                            upper_buffers_rx_tx.append(self.subsystem_info.upper_inputs[i] + "Concate")
+                        upper_buffers_s_c.append(self.subsystem_info.upper_inputs[i] + "Split")
+                    for i in range(len(self.subsystem_info.upper_outputs)):
+                        if self.subsystem_info.upper_outputs_ipc[i]:
+                            upper_buffers_rx_tx.append(self.subsystem_info.upper_outputs[i] + "Tx")
                             upper_buffers_rx_tx_rank = 'source'
                         else:
-                            upper_buffers_rx_tx.append(self.buffer_info.upper_outputs[i] + "Split")
-                        upper_buffers_s_c.append(self.buffer_info.upper_outputs[i] + "Concate")
+                            upper_buffers_rx_tx.append(self.subsystem_info.upper_outputs[i] + "Split")
+                        upper_buffers_s_c.append(self.subsystem_info.upper_outputs[i] + "Concate")
 
                     new_graph.addRank(upper_buffers_rx_tx, rank_type=upper_buffers_rx_tx_rank)
                     new_graph.addRank(upper_buffers_s_c)
@@ -654,29 +838,29 @@ class SubsystemWidget(QWidget):
 
                     buffers_rx_rank = 'same'
                     buffers_tx_rank = 'same'
-                    for i in range(len(self.buffer_info.lower_inputs)):
-                        if self.buffer_info.lower_inputs_ipc[i]:
-                            buffers_rx.append(self.buffer_info.lower_inputs[i] + "Rx")
+                    for i in range(len(self.subsystem_info.lower_inputs)):
+                        if self.subsystem_info.lower_inputs_ipc[i]:
+                            buffers_rx.append(self.subsystem_info.lower_inputs[i] + "Rx")
                             buffers_rx_rank = 'source'
-                        buffers_s.append(self.buffer_info.lower_inputs[i] + "Split")
+                        buffers_s.append(self.subsystem_info.lower_inputs[i] + "Split")
 
-                    for i in range(len(self.buffer_info.upper_inputs)):
-                        if self.buffer_info.upper_inputs_ipc[i]:
-                            buffers_rx.append(self.buffer_info.upper_inputs[i] + "Rx")
+                    for i in range(len(self.subsystem_info.upper_inputs)):
+                        if self.subsystem_info.upper_inputs_ipc[i]:
+                            buffers_rx.append(self.subsystem_info.upper_inputs[i] + "Rx")
                             buffers_rx_rank = 'source'
-                        buffers_s.append(self.buffer_info.upper_inputs[i] + "Split")
+                        buffers_s.append(self.subsystem_info.upper_inputs[i] + "Split")
 
 
-                    for i in range(len(self.buffer_info.lower_outputs)):
-                        if self.buffer_info.lower_outputs_ipc[i]:
-                            buffers_tx.append(self.buffer_info.lower_outputs[i] + "Tx")
+                    for i in range(len(self.subsystem_info.lower_outputs)):
+                        if self.subsystem_info.lower_outputs_ipc[i]:
+                            buffers_tx.append(self.subsystem_info.lower_outputs[i] + "Tx")
                             buffers_tx_rank = 'sink'
-                        buffers_c.append(self.buffer_info.lower_outputs[i] + "Concate")
-                    for i in range(len(self.buffer_info.upper_outputs)):
-                        if self.buffer_info.upper_outputs_ipc[i]:
-                            buffers_tx.append(self.buffer_info.upper_outputs[i] + "Tx")
+                        buffers_c.append(self.subsystem_info.lower_outputs[i] + "Concate")
+                    for i in range(len(self.subsystem_info.upper_outputs)):
+                        if self.subsystem_info.upper_outputs_ipc[i]:
+                            buffers_tx.append(self.subsystem_info.upper_outputs[i] + "Tx")
                             buffers_tx_rank = 'sink'
-                        buffers_c.append(self.buffer_info.upper_outputs[i] + "Concate")
+                        buffers_c.append(self.subsystem_info.upper_outputs[i] + "Concate")
 
                     new_graph.addRank(buffers_rx, rank_type=buffers_rx_rank)
                     new_graph.addRank(buffers_s)
@@ -715,15 +899,15 @@ class SubsystemWidget(QWidget):
                 self.components[value.key].setText(value.key + ' (' + value.value + ')')
 
         #rospy.wait_for_service('/' + name = '/getSubsystemInfo')
-        if self.buffer_info == None:
+        if self.subsystem_info == None:
             try:
                 self._getSubsystemInfo = rospy.ServiceProxy('/' + self.subsystem_name + '/getSubsystemInfo', GetSubsystemInfo)
-                self.buffer_info = self._getSubsystemInfo()
+                self.subsystem_info = self._getSubsystemInfo()
             except rospy.ServiceException, e:
                 print "Service call failed: %s"%e
 
-            if self.buffer_info != None:
-                print self.buffer_info
+            if self.subsystem_info != None:
+                print self.subsystem_info
 
             self.initialized = True
 
@@ -748,29 +932,29 @@ class SubsystemWidget(QWidget):
     def getCommonBuffers(self, subsystem):
         if not self.isInitialized() or not subsystem.isInitialized():
             return None
-        if (subsystem.buffer_info == None) or (self.buffer_info == None):
+        if (subsystem.subsystem_info == None) or (self.subsystem_info == None):
             return None
         common_buffers = None
-        for this_index in range(len(self.buffer_info.upper_inputs)):
-            up_in = self.buffer_info.upper_inputs[this_index]
-            if not self.buffer_info.upper_inputs_ipc[this_index]:
+        for this_index in range(len(self.subsystem_info.upper_inputs)):
+            up_in = self.subsystem_info.upper_inputs[this_index]
+            if not self.subsystem_info.upper_inputs_ipc[this_index]:
                 continue
-            for index in range(len(subsystem.buffer_info.lower_outputs)):
-                lo_out = subsystem.buffer_info.lower_outputs[index]
-                if not subsystem.buffer_info.lower_outputs_ipc[index]:
+            for index in range(len(subsystem.subsystem_info.lower_outputs)):
+                lo_out = subsystem.subsystem_info.lower_outputs[index]
+                if not subsystem.subsystem_info.lower_outputs_ipc[index]:
                     continue
                 if up_in == lo_out:
                     if common_buffers == None:
                         common_buffers = []
                     common_buffers.append(up_in)
 
-        for this_index in range(len(self.buffer_info.upper_outputs)):
-            up_out = self.buffer_info.upper_outputs[this_index]
-            if not self.buffer_info.upper_outputs_ipc[this_index]:
+        for this_index in range(len(self.subsystem_info.upper_outputs)):
+            up_out = self.subsystem_info.upper_outputs[this_index]
+            if not self.subsystem_info.upper_outputs_ipc[this_index]:
                 continue
-            for index in range(len(subsystem.buffer_info.lower_inputs)):
-                lo_in = subsystem.buffer_info.lower_inputs[index]
-                if not subsystem.buffer_info.lower_inputs_ipc[index]:
+            for index in range(len(subsystem.subsystem_info.lower_inputs)):
+                lo_in = subsystem.subsystem_info.lower_inputs[index]
+                if not subsystem.subsystem_info.lower_inputs_ipc[index]:
                     continue
                 if up_out == lo_in:
                     if common_buffers == None:
@@ -807,13 +991,13 @@ class SubsystemWidget(QWidget):
         up_out = []
 
         for buf_name in buffer_list:
-            if buf_name in self.buffer_info.lower_inputs:
+            if buf_name in self.subsystem_info.lower_inputs:
                 lo_in.append(buf_name)
-            elif buf_name in self.buffer_info.upper_inputs:
+            elif buf_name in self.subsystem_info.upper_inputs:
                 up_in.append(buf_name)
-            elif buf_name in self.buffer_info.lower_outputs:
+            elif buf_name in self.subsystem_info.lower_outputs:
                 lo_out.append(buf_name)
-            elif buf_name in self.buffer_info.upper_outputs:
+            elif buf_name in self.subsystem_info.upper_outputs:
                 up_out.append(buf_name)
 
         # buffer group should be either in lower part or upper part
