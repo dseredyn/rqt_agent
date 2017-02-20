@@ -35,15 +35,15 @@ import os
 
 from python_qt_binding import loadUi
 from python_qt_binding.QtCore import Qt, QTimer, Signal, Slot
-from python_qt_binding.QtWidgets import QHeaderView, QMenu, QTreeWidgetItem, QWidget, QVBoxLayout, QLabel, QPushButton, QHBoxLayout, QScrollArea
+from python_qt_binding.QtWidgets import QHeaderView, QMenu, QWidget, QVBoxLayout, QLabel, QPushButton, QHBoxLayout, QScrollArea
 #from PyQt5 import QtCore, QtGui, QtWidgets
 import roslib
 import rospkg
 import rospy
 from rospy.exceptions import ROSException
 
-#from .topic_info import TopicInfo
-from rqt_topic.topic_info import TopicInfo
+from .topic_info import TopicInfo
+#from rqt_topic.topic_info import TopicInfo
 from .subsystem_widget import SubsystemWidget
 
 class SystemWidget(QWidget):
@@ -231,7 +231,6 @@ class SystemWidget(QWidget):
         """
         refresh tree view items
         """
-
         #
         # update the list of subsystems
         #
@@ -437,17 +436,3 @@ class SystemWidget(QWidget):
             if not self.topics_tree_widget.header().restoreState(header_state):
                 rospy.logwarn("rqt_topic: Failed to restore header state.")
 
-class TreeWidgetItem(QTreeWidgetItem):
-
-    def __init__(self, check_state_changed_callback, topic_name, parent=None):
-        super(TreeWidgetItem, self).__init__(parent)
-        self._check_state_changed_callback = check_state_changed_callback
-        self._topic_name = topic_name
-        self.setCheckState(0, Qt.Unchecked)
-
-    def setData(self, column, role, value):
-        if role == Qt.CheckStateRole:
-            state = self.checkState(column)
-        super(TreeWidgetItem, self).setData(column, role, value)
-        if role == Qt.CheckStateRole and state != self.checkState(column):
-            self._check_state_changed_callback(self._topic_name)
