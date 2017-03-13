@@ -125,6 +125,7 @@ class SystemWidget(QWidget):
 
     def checkStructureChange(self):
         result = False
+
         for subsystem_name in self.prev_subsystems:
             if not subsystem_name in self._widgets:
                 result = True
@@ -260,8 +261,21 @@ class SystemWidget(QWidget):
                     new_subsystems[subsystem_name] = self._subsystems[subsystem_name]
                     del self._subsystems[subsystem_name]
 
+        # remove unused subsystems
+        while True:
+            repeat = False
+            for s in self._subsystems:
+                if not s in new_subsystems:
+                    del self._subsystems[s]
+                    repeat = True
+                    break
+            if not repeat:
+                break
+
         # switch to new topic dict
         self._subsystems = new_subsystems
+
+#        print self._subsystems.keys()
 
         #
         # update each subsystem
@@ -289,6 +303,16 @@ class SystemWidget(QWidget):
 #                        new_widgets[subsystem_name].setStateName(value.value, '')
 #                        break
 
+        # remove unused subsystems
+#        while True:
+#            repeat = False
+#            for s in self._widgets:
+#                if not s in new_widgets:
+#                    del self._widgets[s]
+#                    repeat = True
+#                    break
+#            if not repeat:
+#                break
 
         self._widgets = new_widgets
 
@@ -308,17 +332,12 @@ class SystemWidget(QWidget):
             if allInitialized:
                 # remove all widgets from layouts
                 # and remove all layouts
-                for i in range(len(self.levels_layouts)):
+                for i in reversed(range(len(self.levels_layouts))):
                     layout = self.levels_layouts[i]
-                    widgets = self.layout_widgets(layout)
-                    for w in widgets:
-                        if w == None or w.widget() == None:
-                            continue
-                        w.widget().hide()
-                        layout.removeWidget(w.widget())
-                    print "self.layout_widgets(layout):", self.layout_widgets(layout)
+                    for i in reversed(range(layout.count())):
+                        # The new widget is deleted when its parent is deleted.
+                        layout.itemAt(i).widget().setParent(None)
                     self.verticalLayout.removeItem(layout)
-                    print "self.layout_widgets(self.verticalLayout):", self.layout_widgets(self.verticalLayout)
                     del layout
 
                 self.levels_layouts = []
@@ -334,6 +353,16 @@ class SystemWidget(QWidget):
 #                for 
                 # TODO
                 self.structure_changed = False
+
+        while True:
+            repeat = False
+            for s in self.all_subsystems:
+                if not s in self._widgets:
+                    del self.all_subsystems[s]
+                    repeat = True
+                    break
+            if not repeat:
+                break
 
         for subsystem_name in self._widgets:
             self._widgets[subsystem_name].update_subsystem(self._subsystems[subsystem_name].last_message)

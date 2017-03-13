@@ -37,12 +37,14 @@ import subprocess
 
 from python_qt_binding import loadUi
 from python_qt_binding.QtCore import Qt, QTimer, Signal, Slot, QRectF, QPointF
-from python_qt_binding.QtWidgets import QWidget, QPushButton, QVBoxLayout, QHBoxLayout, QLabel, QListWidgetItem, QDialog, QGraphicsView, QGraphicsScene, QGraphicsEllipseItem, QGraphicsPathItem
+from python_qt_binding.QtWidgets import QWidget, QPushButton, QVBoxLayout, QHBoxLayout, QLabel, QListWidgetItem, QDialog, QGraphicsView, QGraphicsScene, QGraphicsEllipseItem, QGraphicsPathItem, QTableWidgetItem
 from python_qt_binding.QtGui import QColor, QPen, QBrush, QPainterPath, QPolygonF, QTransform
 import roslib
 import rospkg
 import rospy
 from rospy.exceptions import ROSException
+
+import xml.dom.minidom as minidom
 
 from rqt_topic.topic_info import TopicInfo
 
@@ -221,7 +223,7 @@ class MyDialog(QDialog):
                     self.comboBoxConnections.addItem(port_str)
                 break
 
-    def __init__(self, parent=None):
+    def __init__(self, subsystem_name, parent=None):
         super(MyDialog, self).__init__(parent)
 
         self.parent = parent
@@ -232,6 +234,7 @@ class MyDialog(QDialog):
         ui_file = os.path.join(rp.get_path('rqt_agent'), 'resource', 'GraphVis.ui')
         loadUi(ui_file, self)
 
+        self.setWindowTitle(subsystem_name + " - transition function")
         self.components_state = None
         self.initialized = False
 
@@ -395,6 +398,38 @@ class MyDialog(QDialog):
 #        //ui->graphicsView->setTransform(QTransform(h11, h12, h21, h22, 0, 0));
 
 
+class StateHistoryDialog(QDialog):
+
+    @Slot()
+    def closeClick(self):
+        self.close()
+
+    def __init__(self, subsystem_name, parent=None):
+        super(StateHistoryDialog, self).__init__(parent)
+
+        self.parent = parent
+
+        self.setWindowFlags(Qt.Window)
+
+        rp = rospkg.RosPack()
+        ui_file = os.path.join(rp.get_path('rqt_agent'), 'resource', 'StateHistory.ui')
+        loadUi(ui_file, self)
+
+        self.setWindowTitle(subsystem_name + " - state history")
+
+        self.pushButton_close.clicked.connect(self.closeClick)
+
+    def updateState(self, mcd):
+        hist = mcd[0]
+        if self.tableWidget.rowCount() != len(hist):
+            self.tableWidget.setRowCount( len(hist) )
+        row = 0
+        for ss in hist:
+            for col in range(4):
+                self.tableWidget.setItem(row, col, QTableWidgetItem(ss[col]))
+#                item.setText( ss[col] )
+            row = row + 1
+
 class SubsystemWidget(QWidget):
     """
     main class inherits from the ui window class.
@@ -454,6 +489,11 @@ class SubsystemWidget(QWidget):
         #self.dialogGraph.exec_()
         self.dialogGraph.show()
 
+    @Slot()
+    def on_click_showHistory(self):
+        #self.dialogGraph.exec_()
+        self.dialogHistory.show()
+
     def __init__(self, plugin=None, name=None):
         """
         @type selected_topics: list of tuples.
@@ -493,9 +533,11 @@ class SubsystemWidget(QWidget):
 
         self.graph = None
 
-        self.dialogGraph = MyDialog(self)
-
+        self.dialogGraph = MyDialog(self.subsystem_name, self)
         self.showGraph.clicked.connect(self.on_click)
+
+        self.dialogHistory = StateHistoryDialog(self.subsystem_name, self)
+        self.showHistory.clicked.connect(self.on_click_showHistory)
 
     def isInitialized(self):
         return self.initialized
@@ -670,6 +712,29 @@ class SubsystemWidget(QWidget):
 
         return (comp_from.name, port_from, comp_to.name, port_to)
 
+    def parseMasterComponentDiag(self, state):
+        ss_history = []
+        ret_period = "?"
+
+        dom = minidom.parseString(state)
+        mcd = dom.getElementsByTagName("mcd")
+        if len(mcd) != 1:
+            return (ss_history, ret_period)
+
+        hist = mcd[0].getElementsByTagName("h")
+        if len(hist) == 1:
+            ss_list = hist[0].getElementsByTagName("ss")
+            for ss in ss_list:
+#                print "ss", ss
+#                print dir(ss.getAttribute("n")) # string
+                ss_history.append( (ss.getAttribute("n"), ss.getAttribute("r"), ss.getAttribute("t"), ss.getAttribute("e")) )
+
+        period = mcd[0].getElementsByTagName("p")
+        if len(period) == 1:
+            ret_period = period[0].childNodes[0].data
+
+        return (ss_history, ret_period)
+
     def update_subsystem(self, msg):
         for value in msg.status[1].values:
             if value.key == 'master_component':
@@ -754,11 +819,11 @@ class SubsystemWidget(QWidget):
 
                 self.graph = new_graph
 
-                # remove unconnected edges and "graph_component", "scheme" and "diag"
+                # remove unconnected edges and "graph_component", "scheme", "diag" and "gazebo"
                 new_graph = self.Graph()
                 data_edges = []
                 for v in self.graph.vertices:
-                    if v[0] == '"scheme"' or v[0] == '"graph_component"' or v[0] == '"diag"':
+                    if v[0] == '"scheme"' or v[0] == '"graph_component"' or v[0] == '"diag"' or v[0] == '"gazebo"':
                         continue
                     if v[1].shape == 'point':
                         data_edges.append(v[0])
@@ -911,23 +976,14 @@ class SubsystemWidget(QWidget):
 
             self.initialized = True
 
-        beg_idx = self.state.find('state:')
-        if beg_idx >= 0:
-            end_idx = self.state.find(',', beg_idx)
-            if end_idx >= 0:
-                state_name = self.state[beg_idx+6:end_idx]
-            else:
-                state_name = self.state[beg_idx+6:]
-            self.SubsystemState.setText(state_name.strip())
+        mcd = self.parseMasterComponentDiag(self.state)
+        if len(mcd[0]) > 0:
+            self.SubsystemState.setText(mcd[0][0][0])
+            self.dialogHistory.updateState(mcd)
+        else:
+            self.SubsystemState.setText("unknown")
 
-        beg_idx = self.state.find('behavior:')
-        if beg_idx >= 0:
-            end_idx = self.state.find(',', beg_idx)
-            if end_idx >= 0:
-                behavior_name = self.state[beg_idx+9:end_idx]
-            else:
-                behavior_name = self.state[beg_idx+9:]
-            self.SubsystemBehavior.setText(behavior_name.strip())
+#            self.SubsystemBehavior.setText(behavior_name.strip())
 
     def getCommonBuffers(self, subsystem):
         if not self.isInitialized() or not subsystem.isInitialized():

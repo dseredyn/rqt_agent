@@ -109,33 +109,17 @@
            </widget>
           </item>
           <item>
-           <widget class="QLabel" name="label">
-            <property name="text">
-             <string>behavior:</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QLabel" name="SubsystemBehavior">
-            <property name="maximumSize">
-             <size>
-              <width>100</width>
-              <height>16777215</height>
-             </size>
-            </property>
-            <property name="text">
-             <string>SubsystemBehavior</string>
-            </property>
-            <property name="textFormat">
-             <enum>Qt::PlainText</enum>
-            </property>
-           </widget>
-          </item>
-          <item>
            <widget class="QPushButton" name="showGraph">
             <property name="text">
-             <string>Show Transition
+             <string>Transition
 Function</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="showHistory">
+            <property name="text">
+             <string>State history</string>
             </property>
            </widget>
           </item>
