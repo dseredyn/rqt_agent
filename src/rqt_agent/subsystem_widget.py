@@ -980,6 +980,7 @@ class SubsystemWidget(QWidget):
         if len(mcd[0]) > 0:
             self.SubsystemState.setText(mcd[0][0][0])
             self.dialogHistory.updateState(mcd)
+            self.PeriodWall.setText(mcd[1])
         else:
             self.SubsystemState.setText("unknown")
 

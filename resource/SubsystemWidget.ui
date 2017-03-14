@@ -109,6 +109,20 @@
            </widget>
           </item>
           <item>
+           <widget class="QLabel" name="label">
+            <property name="text">
+             <string>period (wall):</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="PeriodWall">
+            <property name="text">
+             <string>TextLabel</string>
+            </property>
+           </widget>
+          </item>
+          <item>
            <widget class="QPushButton" name="showGraph">
             <property name="text">
              <string>Transition
