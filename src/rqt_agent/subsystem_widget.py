@@ -429,6 +429,8 @@ class StateHistoryDialog(QDialog):
                 self.tableWidget.setItem(row, col, QTableWidgetItem(ss[col]))
 #                item.setText( ss[col] )
             row = row + 1
+        self.labelCurrentPredicates.setText(mcd[1])
+
 
 class SubsystemWidget(QWidget):
     """
@@ -729,11 +731,17 @@ class SubsystemWidget(QWidget):
 #                print dir(ss.getAttribute("n")) # string
                 ss_history.append( (ss.getAttribute("n"), ss.getAttribute("r"), ss.getAttribute("t"), ss.getAttribute("e")) )
 
+        current_predicates = mcd[0].getElementsByTagName("pr")
+        curr_pred = None
+        if len(current_predicates) == 1:
+            curr_pred = current_predicates[0].getAttribute("v")
+
         period = mcd[0].getElementsByTagName("p")
+        ret_period = None
         if len(period) == 1:
             ret_period = period[0].childNodes[0].data
 
-        return (ss_history, ret_period)
+        return (ss_history, curr_pred, ret_period)
 
     def update_subsystem(self, msg):
         for value in msg.status[1].values:
@@ -980,7 +988,7 @@ class SubsystemWidget(QWidget):
         if len(mcd[0]) > 0:
             self.SubsystemState.setText(mcd[0][0][0])
             self.dialogHistory.updateState(mcd)
-            self.PeriodWall.setText(mcd[1])
+            self.PeriodWall.setText(mcd[2])
         else:
             self.SubsystemState.setText("unknown")
 
