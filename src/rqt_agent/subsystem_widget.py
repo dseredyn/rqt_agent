@@ -903,7 +903,7 @@ class SubsystemWidget(QWidget):
                     new_graph.addRank(upper_buffers_s_c)
                     new_graph.addRank(lower_buffers_s_c)
                     new_graph.addRank(lower_buffers_rx_tx, rank_type=lower_buffers_rx_tx_rank)
-                else:
+                elif False:
                     buffers_rx = []
                     buffers_s = []
                     buffers_tx = []
@@ -911,29 +911,29 @@ class SubsystemWidget(QWidget):
 
                     buffers_rx_rank = 'same'
                     buffers_tx_rank = 'same'
-                    for i in range(len(self.subsystem_info.lower_inputs)):
+                    for i in range(len(self.subsystem_info.alias_lower_inputs)):
                         if self.subsystem_info.lower_inputs_ipc[i]:
-                            buffers_rx.append(self.subsystem_info.lower_inputs[i] + "Rx")
+                            buffers_rx.append(self.subsystem_info.alias_lower_inputs[i] + "Rx")
                             buffers_rx_rank = 'source'
-                        buffers_s.append(self.subsystem_info.lower_inputs[i] + "Split")
+                        buffers_s.append(self.subsystem_info.alias_lower_inputs[i] + "Split")
 
-                    for i in range(len(self.subsystem_info.upper_inputs)):
+                    for i in range(len(self.subsystem_info.alias_upper_inputs)):
                         if self.subsystem_info.upper_inputs_ipc[i]:
-                            buffers_rx.append(self.subsystem_info.upper_inputs[i] + "Rx")
+                            buffers_rx.append(self.subsystem_info.alias_upper_inputs[i] + "Rx")
                             buffers_rx_rank = 'source'
-                        buffers_s.append(self.subsystem_info.upper_inputs[i] + "Split")
+                        buffers_s.append(self.subsystem_info.alias_upper_inputs[i] + "Split")
 
 
-                    for i in range(len(self.subsystem_info.lower_outputs)):
+                    for i in range(len(self.subsystem_info.alias_lower_outputs)):
                         if self.subsystem_info.lower_outputs_ipc[i]:
-                            buffers_tx.append(self.subsystem_info.lower_outputs[i] + "Tx")
+                            buffers_tx.append(self.subsystem_info.alias_lower_outputs[i] + "Tx")
                             buffers_tx_rank = 'sink'
-                        buffers_c.append(self.subsystem_info.lower_outputs[i] + "Concate")
-                    for i in range(len(self.subsystem_info.upper_outputs)):
+                        buffers_c.append(self.subsystem_info.alias_lower_outputs[i] + "Concate")
+                    for i in range(len(self.subsystem_info.alias_upper_outputs)):
                         if self.subsystem_info.upper_outputs_ipc[i]:
-                            buffers_tx.append(self.subsystem_info.upper_outputs[i] + "Tx")
+                            buffers_tx.append(self.subsystem_info.alias_upper_outputs[i] + "Tx")
                             buffers_tx_rank = 'sink'
-                        buffers_c.append(self.subsystem_info.upper_outputs[i] + "Concate")
+                        buffers_c.append(self.subsystem_info.alias_upper_outputs[i] + "Concate")
 
                     new_graph.addRank(buffers_rx, rank_type=buffers_rx_rank)
                     new_graph.addRank(buffers_s)
