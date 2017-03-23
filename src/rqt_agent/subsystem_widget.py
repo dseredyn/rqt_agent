@@ -247,14 +247,9 @@ class MyDialog(QDialog):
 
         self.componentSelected(None)
 
-    def drawGraph(self, graph_file_name):
-        self.graph = None
-        try:
-            with open(graph_file_name, 'r') as f:
-                self.graph = f.read().splitlines()
-        except (IOError, OSError) as e:
-            print "caught exception: ", e
-            return
+    def drawGraph(self, graph_str):
+
+        self.graph = graph_str.splitlines()
 
         header = self.graph[0].split()
         if header[0] != 'graph':
@@ -544,137 +539,6 @@ class SubsystemWidget(QWidget):
     def isInitialized(self):
         return self.initialized
 
-    class Graph:
-        class Options:
-            def toStr(self):
-                result = ''
-                if self.style:
-                    result = result + "style=" + self.style + ','
-
-                if self.width:
-                    result = result + "width=" + self.width + ','
-
-                if self.height:
-                    result = result + "height=" + self.height + ','
-
-                if self.color:
-                    result = result + "color=" + self.color + ','
-
-                if self.shape:
-                    result = result + "shape=" + self.shape + ','
-
-                if self.label:
-                    result = result + "label=" + self.label + ','
-
-                if result == '':
-                    return None
-
-                return result[:-1]      # remove trailing ','
-
-            def getOption(self, options_str, option):
-                idx = options_str.find(option)
-                if idx == -1:
-                    return None
-
-                idx = options_str.find('=', idx)
-                if idx == -1:
-                    raise Exception('option has no \'=\'', 'option: ' + option + ', options_str: ' + options_str)
-                comma_idx = options_str.find(',', idx)
-                bracket_idx = options_str.find(']', idx)
-                if comma_idx == -1 and bracket_idx == -1:
-                    value = options_str[idx+1:]
-                elif comma_idx == -1:
-                    value = options_str[idx+1:bracket_idx]
-                elif bracket_idx == -1:
-                    value = options_str[idx+1:comma_idx]
-                else:
-                    value = options_str[idx+1:min(bracket_idx, comma_idx)]
-                value = value.strip()
-                return value
-
-            def __init__(self, options_str=None):
-                if options_str:
-                    self.style = self.getOption(options_str, "style")
-                    self.width = self.getOption(options_str, "width")
-                    self.height = self.getOption(options_str, "height")
-                    self.color = self.getOption(options_str, "color")
-                    self.shape = self.getOption(options_str, "shape")
-                    self.label = self.getOption(options_str, "label")
-                else:
-                    self.style = None
-                    self.width = None
-                    self.height = None
-                    self.color = None
-                    self.shape = None
-                    self.label = None
-            
-
-        def clear(self):
-            self.edges = []
-            self.vertices = []
-            self.ranks = []
-
-        def parseDot(self, dot_graph):
-            self.clear()
-
-            for l in dot_graph:
-                brackets_beg = l.find('[')
-                if brackets_beg == -1:
-                    continue
-                brackets_end = l.find(']', brackets_beg)
-                data = l[:brackets_beg]
-                options = l[brackets_beg+1:brackets_end]
-                edge_sign = data.find('->')
-                if edge_sign > 0:
-                    edge_from = data[:edge_sign]
-                    edge_to = data[edge_sign+2:]
-                    self.edges.append( (edge_from, edge_to, self.Options(options)) )
-                else:
-                    self.vertices.append( (data, self.Options(options)) )
-
-        def __init__(self, dot_graph=None):
-            self.clear()
-
-            if dot_graph:
-                self.parseDot(dot_graph)
-
-        def toStr(self):
-            lines = []
-            lines.append('digraph G {\n')
-            lines.append('rankdir=TB;\n')
-            for v in self.vertices:
-                options_str = v[1].toStr()
-                if options_str:
-                    options_str = '[' + options_str + ']'
-                else:
-                    options_str = ''
-                lines.append(v[0] + options_str + ';\n')
-
-            for e in self.edges:
-                options_str = e[2].toStr()
-                if options_str:
-                    options_str = '[' + options_str + ']'
-                else:
-                    options_str = ''
-
-                lines.append(e[0] + '->' + e[1] + options_str + ';\n')
-
-            for rank in self.ranks:
-                lines.append(rank)
-            lines.append('}\n')
-            return lines
-
-        def addRank(self, name_list, rank_type='same'):
-            if name_list == None or len(name_list) == 0:
-                return
-
-            rank_line = "{ rank=" + rank_type + "; "
-            for name in name_list:
-                rank_line = rank_line + ' "' + name + '"'
-            rank_line = rank_line + ' }\n'
-
-            self.ranks.append(rank_line)
-
     def extractConnectionInfo(self, conn, comp_from, comp_to):
         if (not comp_to) or (not comp_from):
             print 'WARNING: wrong edge(1): ', conn, comp_from, comp_to
@@ -756,197 +620,56 @@ class SubsystemWidget(QWidget):
                     self.all_buffers[value.key[:-2]].setToolTip(value.value)
 
         if self.graph == None and self.initialized:
-            #
-            # read the dot graph from file
-            #
-            dot_graph = None
-            try:
-                with open('/tmp/' + self.subsystem_name + '.dot', 'r') as f:
-                    dot_graph = f.read().splitlines()
-            except (IOError, OSError) as e:
-                print "caught exception: ", e
+            conn_set = set()
 
-            if dot_graph != None:
-                print "Read dot graph, lines:", len(dot_graph)
-                self.graph = self.Graph(dot_graph)
-                print "Parsed dot graph: vertices:", len(self.graph.vertices), "edges:", len(self.graph.edges)
+            print self.subsystem_info.behaviors
 
-                # remove ugly 'data' boxes
-                new_graph = self.Graph()
-                data_edges = {}
-                for v in self.graph.vertices:
-                    if v[1].shape == 'box':# and v[1].label=='"data"':
-                        data_edges[v[0]] = [None, None]
-                    else:
-                        new_graph.vertices.append(v)
-                for e in self.graph.edges:
-                    if e[1] in data_edges:
-                        data_edges[e[1]][0] = e[0]
-                    elif e[0] in data_edges:
-                        data_edges[e[0]][1] = e[1]
-                    else:
-                        new_graph.edges.append( e )
-                for label in data_edges:
-                    if data_edges[label][0] == None or data_edges[label][1] == None:
-                        continue
-                    options = self.Graph.Options()
-                    options.label = None #label     # these labels are looong
-                    new_graph.edges.append( (data_edges[label][0], data_edges[label][1], options) )
+            sw_comp = set()
+            for b in self.subsystem_info.behaviors:
+                for r in b.running_components:
+                    sw_comp.add(r)
 
-                # save all connections
-                self.all_connections = []
+            all_comp = set()
+            for comp in self.subsystem_info.components:
+                all_comp.add(comp.name)
+
+            always_running = all_comp - sw_comp
+            print "always_running", always_running
+
+            current_running = set()
+            behavior_idx = 3
+            for r in self.subsystem_info.behaviors[behavior_idx].running_components:
+                current_running.add(r)
+
+            other_behaviors_comp = sw_comp - current_running
+            running = always_running.union(current_running)
+
+            for c in self.subsystem_info.connections:
+                if (not c.component_from.strip()) or (not c.component_to.strip()):
+                    continue
+                if (not c.component_from in current_running) and (not c.component_to in current_running):
+                    continue
+                if c.component_from in other_behaviors_comp or c.component_to in other_behaviors_comp:
+                    continue
+                conn_set.add( (c.component_from, c.component_to) )
+
+            dot = "digraph " + self.subsystem_name + " {\n"
+            for c in conn_set:
+                dot += c[0] + " -> " + c[1] + ";\n"
+            dot += "}\n"
 
 
-                for conn in data_edges:
-                    edge_from = data_edges[conn][0]
-                    edge_to = data_edges[conn][1]
+            in_read, in_write = os.pipe()
+            os.write(in_write, dot)
+            os.close(in_write)
 
-                    if (not edge_from) or (not edge_to):
-                        continue
+            out_read, out_write = os.pipe()
+            subprocess.call(['dot', '-Tplain'], stdin=in_read, stdout=out_write)
+            graph_str = os.read(out_read, 1000000)
+            os.close(out_read)
 
-                    edge_name = conn.strip('"')
-                    edge_from = edge_from.strip('"')
-                    edge_to = edge_to.strip('"')
-
-                    comp_from = None
-                    comp_to = None
-                    for comp in self.subsystem_info.components:
-                        if comp.name == edge_from:
-                            comp_from = comp
-                            if comp_to:
-                                break
-                        if comp.name == edge_to:
-                            comp_to = comp
-                            if comp_from:
-                                break
-#                    print edge_from, edge_to, edge_name
-                    conn_info = self.extractConnectionInfo(edge_name, comp_from, comp_to)
-                    if conn_info:
-                        self.all_connections.append(conn_info)
-# TODO
-
-                self.graph = new_graph
-
-                # remove unconnected edges and "graph_component", "scheme", "diag" and "gazebo"
-                new_graph = self.Graph()
-                data_edges = []
-                for v in self.graph.vertices:
-                    if v[0] == '"scheme"' or v[0] == '"graph_component"' or v[0] == '"diag"' or v[0] == '"gazebo"':
-                        continue
-                    if v[1].shape == 'point':
-                        data_edges.append(v[0])
-                    else:
-                        new_graph.vertices.append(v)
-                        new_graph.vertices[-1][1].width = None
-                        new_graph.vertices[-1][1].height = None
-
-                for e in self.graph.edges:
-                    if e[0] in data_edges or e[1] in data_edges:
-                        pass
-                    else:
-                        new_graph.edges.append( e )
-
-                self.graph = new_graph
-
-                # remove multiple edges
-                new_graph = self.Graph()
-                data_edges = set()
-                for v in self.graph.vertices:
-                    new_graph.vertices.append(v)
-
-                for e in self.graph.edges:
-                    edge = (e[0], e[1])
-                    if not edge in data_edges:
-                        new_graph.edges.append( e )
-                        data_edges.add(edge)
-
-                # draw inputs on the top and outputs at the bottom
-                if False:
-                    lower_buffers_rx_tx = []
-                    lower_buffers_s_c = []
-                    upper_buffers_rx_tx = []
-                    upper_buffers_s_c = []
-
-                    lower_buffers_rx_tx_rank = 'same'
-                    upper_buffers_rx_tx_rank = 'same'
-                    for i in range(len(self.subsystem_info.lower_inputs)):
-                        if self.subsystem_info.lower_inputs_ipc[i]:
-                            lower_buffers_rx_tx.append(self.subsystem_info.lower_inputs[i] + "Rx")
-                            lower_buffers_rx_tx_rank = 'sink'
-                        else:
-                            lower_buffers_rx_tx.append(self.subsystem_info.lower_inputs[i] + "Concate")
-                        lower_buffers_s_c.append(self.subsystem_info.lower_inputs[i] + "Split")
-                    for i in range(len(self.subsystem_info.lower_outputs)):
-                        if self.subsystem_info.lower_outputs_ipc[i]:
-                            lower_buffers_rx_tx.append(self.subsystem_info.lower_outputs[i] + "Tx")
-                            lower_buffers_rx_tx_rank = 'sink'
-                        else:
-                            lower_buffers_rx_tx.append(self.subsystem_info.lower_outputs[i] + "Split")
-                        lower_buffers_s_c.append(self.subsystem_info.lower_outputs[i] + "Concate")
-
-                    for i in range(len(self.subsystem_info.upper_inputs)):
-                        if self.subsystem_info.upper_inputs_ipc[i]:
-                            upper_buffers_rx_tx.append(self.subsystem_info.upper_inputs[i] + "Rx")
-                            upper_buffers_rx_tx_rank = 'source'
-                        else:
-                            upper_buffers_rx_tx.append(self.subsystem_info.upper_inputs[i] + "Concate")
-                        upper_buffers_s_c.append(self.subsystem_info.upper_inputs[i] + "Split")
-                    for i in range(len(self.subsystem_info.upper_outputs)):
-                        if self.subsystem_info.upper_outputs_ipc[i]:
-                            upper_buffers_rx_tx.append(self.subsystem_info.upper_outputs[i] + "Tx")
-                            upper_buffers_rx_tx_rank = 'source'
-                        else:
-                            upper_buffers_rx_tx.append(self.subsystem_info.upper_outputs[i] + "Split")
-                        upper_buffers_s_c.append(self.subsystem_info.upper_outputs[i] + "Concate")
-
-                    new_graph.addRank(upper_buffers_rx_tx, rank_type=upper_buffers_rx_tx_rank)
-                    new_graph.addRank(upper_buffers_s_c)
-                    new_graph.addRank(lower_buffers_s_c)
-                    new_graph.addRank(lower_buffers_rx_tx, rank_type=lower_buffers_rx_tx_rank)
-                elif False:
-                    buffers_rx = []
-                    buffers_s = []
-                    buffers_tx = []
-                    buffers_c = []
-
-                    buffers_rx_rank = 'same'
-                    buffers_tx_rank = 'same'
-                    for i in range(len(self.subsystem_info.alias_lower_inputs)):
-                        if self.subsystem_info.lower_inputs_ipc[i]:
-                            buffers_rx.append(self.subsystem_info.alias_lower_inputs[i] + "Rx")
-                            buffers_rx_rank = 'source'
-                        buffers_s.append(self.subsystem_info.alias_lower_inputs[i] + "Split")
-
-                    for i in range(len(self.subsystem_info.alias_upper_inputs)):
-                        if self.subsystem_info.upper_inputs_ipc[i]:
-                            buffers_rx.append(self.subsystem_info.alias_upper_inputs[i] + "Rx")
-                            buffers_rx_rank = 'source'
-                        buffers_s.append(self.subsystem_info.alias_upper_inputs[i] + "Split")
-
-
-                    for i in range(len(self.subsystem_info.alias_lower_outputs)):
-                        if self.subsystem_info.lower_outputs_ipc[i]:
-                            buffers_tx.append(self.subsystem_info.alias_lower_outputs[i] + "Tx")
-                            buffers_tx_rank = 'sink'
-                        buffers_c.append(self.subsystem_info.alias_lower_outputs[i] + "Concate")
-                    for i in range(len(self.subsystem_info.alias_upper_outputs)):
-                        if self.subsystem_info.upper_outputs_ipc[i]:
-                            buffers_tx.append(self.subsystem_info.alias_upper_outputs[i] + "Tx")
-                            buffers_tx_rank = 'sink'
-                        buffers_c.append(self.subsystem_info.alias_upper_outputs[i] + "Concate")
-
-                    new_graph.addRank(buffers_rx, rank_type=buffers_rx_rank)
-                    new_graph.addRank(buffers_s)
-                    new_graph.addRank(buffers_c)
-                    new_graph.addRank(buffers_tx, rank_type=buffers_tx_rank)
-
-                self.graph = new_graph
-
-                with open('/tmp/' + self.subsystem_name + '_out.dot', 'w') as f:
-                    f.writelines( self.graph.toStr() )
-
-                subprocess.call(['dot', '-Tplain', '-O', '/tmp/' + self.subsystem_name + '_out.dot'])
-                self.dialogGraph.drawGraph('/tmp/' + self.subsystem_name + '_out.dot.plain')
+            self.dialogGraph.drawGraph(graph_str)
+            self.graph = True
 
         # iterate through components and add them to QListWidget
         for value in msg.status[0].values:
