@@ -182,12 +182,13 @@ class MyDialog(QDialog):
         for conn in self.parent.all_connections:
             if (conn[0] == self.component_selected and conn[1] == self.selected_component_port_names[index]) or \
                 (conn[2] == self.component_selected and conn[3] == self.selected_component_port_names[index]):
-                for e in self.edges:
-                    data = e.data(0)
-                    if (data[0] == conn[0] and data[1] == conn[2]) or \
-                        (data[0] == conn[2] and data[1] == conn[0]):
-                        e.setPen( QPen(QBrush(QColor(255,0,0)), 5) )
-                        self.prev_selected_connections.append(e)
+                for graph_name in self.edges:
+                    for e in self.edges[graph_name]:
+                        data = e.data(0)
+                        if (data[0] == conn[0] and data[1] == conn[2]) or \
+                            (data[0] == conn[2] and data[1] == conn[0]):
+                            e.setPen( QPen(QBrush(QColor(255,0,0)), 5) )
+                            self.prev_selected_connections.append(e)
 
     @Slot(str)
     def componentSelected(self, name):
@@ -223,6 +224,11 @@ class MyDialog(QDialog):
                     self.comboBoxConnections.addItem(port_str)
                 break
 
+    @Slot(int)
+    def graphSelected(self, index):
+        graph_name = self.comboBoxGraphs.itemText(index)
+        self.showGraph(graph_name)
+
     def __init__(self, subsystem_name, parent=None):
         super(MyDialog, self).__init__(parent)
 
@@ -244,28 +250,49 @@ class MyDialog(QDialog):
 
         self.prev_selected_connections = []
         self.comboBoxConnections.highlighted.connect(self.portSelected)
+        self.comboBoxGraphs.highlighted.connect(self.graphSelected)
 
         self.componentSelected(None)
+        self.scene = {}
+        self.graphicsView = None
+        self.nodes = {}
+        self.edges = {}
 
-    def drawGraph(self, graph_str):
+    def showGraph(self, graph_name):
+        if not graph_name in self.scene:
+            print "could not show graph " + graph_name
+            return
 
-        self.graph = graph_str.splitlines()
+        if not self.graphicsView:
+            self.graphicsView = GraphView()
+            self.verticalLayout.insertWidget(0, self.graphicsView)
 
-        header = self.graph[0].split()
+        self.graphicsView.setScene(self.scene[graph_name])
+
+        self.graphicsView.comp_select_signal.connect(self.componentSelected)
+        self.initialized = True
+
+    def addGraph(self, graph_name, graph_str):
+
+        self.comboBoxGraphs.addItem(graph_name)
+
+        graph = graph_str.splitlines()
+
+        header = graph[0].split()
         if header[0] != 'graph':
-            raise Exception('wrong graph format', 'header is: ' + self.graph[0])
+            raise Exception('wrong graph format', 'header is: ' + graph[0])
 
         self.scale_factor = 100.0
         self.width = float(header[2])
         self.height = float(header[3])
         print "QGraphicsScene size:", self.width, self.height
 
-        self.scene = GraphScene(QRectF(0, 0, self.scX(self.width), self.scY(self.height)))
+        self.scene[graph_name] = GraphScene(QRectF(0, 0, self.scX(self.width), self.scY(self.height)))
 
-        self.nodes = {}
-        self.edges = []
+        self.nodes[graph_name] = {}
+        self.edges[graph_name] = []
 
-        for l in self.graph:
+        for l in graph:
             items = l.split()
             if len(items) == 0:
                 continue
@@ -275,27 +302,42 @@ class MyDialog(QDialog):
                 #node CImp 16.472 5.25 0.86659 0.5 CImp filled ellipse lightblue lightblue
                 if len(items) != 11:
                     raise Exception('wrong number of items in line', 'line is: ' + l)
-                name = items[1]
+                name = items[6]
+                if name == "\"\"":
+                    name = ""
                 w = self.scX(items[4])
                 h = self.scY(items[5])
                 x = self.tfX(items[2])
                 y = self.tfY(items[3])
 
-                self.nodes[name] = self.scene.addEllipse(x - w/2, y - h/2, w, h)
-                self.nodes[name].setData(0, name)
-                text_item = self.scene.addSimpleText(name)
+                self.nodes[graph_name][name] = self.scene[graph_name].addEllipse(x - w/2, y - h/2, w, h)
+                self.nodes[graph_name][name].setData(0, name)
+                text_item = self.scene[graph_name].addSimpleText(name)
                 br = text_item.boundingRect()
                 text_item.setPos(x - br.width()/2, y - br.height()/2)
 
             elif items[0] == 'edge':
+                # without label:
                 # edge CImp Ts 4 16.068 5.159 15.143 4.9826 12.876 4.5503 11.87 4.3583 solid black
+                #
+                # with label:
+                # edge b_stSplit TorsoVelAggregate 7 7.5051 6.3954 7.7054 6.3043 7.9532 6.1899 8.1728 6.0833 8.4432 5.9522 8.7407 5.8012 8.9885 5.6735 aa 8.6798 5.9792 solid black
                 line_len = int(items[3])
-                if (line_len * 2 + 6) != len(items):
-                    raise Exception('wrong number of items in line', 'should be: ' + str(line_len * 2 + 6) + ', line is: ' + l)
+                label_text = None
+                label_pos = None
+                if (line_len * 2 + 6) == len(items):
+                    # no label
+                    pass
+                elif (line_len * 2 + 9) == len(items):
+                    # edge with label
+                    label_text = items[4 + line_len*2]
+                    label_pos = QPointF(self.tfX(items[4 + line_len*2 + 1]), self.tfY(items[4 + line_len*2 + 2]))
+                else:
+                    raise Exception('wrong number of items in line', 'should be: ' + str(line_len * 2 + 6) + " or " + str(line_len * 2 + 9) + ', line is: ' + l)
+                    
                 line = []
                 for i in range(line_len):
                     line.append( (self.tfX(items[4+i*2]), self.tfY(items[5+i*2])) )
-
                 control_points_idx = 1
                 path = QPainterPath(QPointF(line[0][0], line[0][1]))
                 while True:
@@ -306,9 +348,9 @@ class MyDialog(QDialog):
                     control_points_idx = control_points_idx + 3
                     if control_points_idx >= len(line):
                         break
-                edge = self.scene.addPath(path)
+                edge = self.scene[graph_name].addPath(path)
                 edge.setData(0, (items[1], items[2]))
-                self.edges.append(edge)
+                self.edges[graph_name].append(edge)
 
                 end_p = QPointF(line[-1][0], line[-1][1])
                 p0 = end_p - QPointF(line[-2][0], line[-2][1])
@@ -327,15 +369,17 @@ class MyDialog(QDialog):
 #                poly_path = QPainterPath()
 #                poly_path.addPolygon(poly)
 #                painter = QPainter()
-                self.scene.addPolygon(poly)
+                self.scene[graph_name].addPolygon(poly)
 
-        self.graphicsView = GraphView()
-        self.verticalLayout.insertWidget(0, self.graphicsView)
-        self.graphicsView.setScene(self.scene)
-
-        self.graphicsView.comp_select_signal.connect(self.componentSelected)
-
-        self.initialized = True
+                if label_text and label_pos:
+                    if label_text[0] == "\"":
+                        label_text = label_text[1:]
+                    if label_text[-1] == "\"":
+                        label_text = label_text[:-1]
+                    label_text = label_text.replace("\\n", "\n")
+                    label_item = self.scene[graph_name].addSimpleText(label_text)
+                    br = label_item.boundingRect()
+                    label_item.setPos(label_pos.x() - br.width()/2, label_pos.y() - br.height()/2)
 
     @Slot()
     def closeClick(self):
@@ -372,9 +416,10 @@ class MyDialog(QDialog):
 
         if changed:
             self.components_state = components_state
-            for comp_name in self.nodes:
-                if comp_name in self.components_state:
-                    self.nodes[comp_name].setBrush(getComponentBrush(self.components_state[comp_name]))
+            for graph_name in self.nodes:
+                for comp_name in self.nodes[graph_name]:
+                    if comp_name in self.components_state:
+                        self.nodes[graph_name][comp_name].setBrush(getComponentBrush(self.components_state[comp_name]))
 
 #    def wheelEvent(self, event):
 #        print dir(event)
@@ -607,6 +652,81 @@ class SubsystemWidget(QWidget):
 
         return (ss_history, curr_pred, ret_period)
 
+    def getConnectionsSet(self, name):
+            behavior = None
+            for b in self.subsystem_info.behaviors:
+                if b.name == name:
+                    behavior = b
+                    break
+            
+            sw_comp = set()
+            for b in self.subsystem_info.behaviors:
+                for r in b.running_components:
+                    sw_comp.add(r)
+
+            all_comp = set()
+            for comp in self.subsystem_info.components:
+                all_comp.add(comp.name)
+
+            always_running = all_comp - sw_comp
+
+            conn_set = {}
+            current_running = set()
+            if behavior:
+                for r in behavior.running_components:
+                    current_running.add(r)
+            other_behaviors_comp = sw_comp - current_running
+            running = always_running.union(current_running)
+
+            for c in self.subsystem_info.connections:
+                if ((not c.component_from.strip()) or (not c.component_to.strip())) and not c.unconnected:
+                    continue
+                if behavior:
+                    if (not c.component_from in current_running) and (not c.component_to in current_running):
+                        continue
+                    if c.component_from in other_behaviors_comp or c.component_to in other_behaviors_comp:
+                        continue
+                elif name == "<always running>":
+                    if (not c.component_from in always_running) or (not c.component_to in always_running):
+                        continue
+                elif name == "<all>":
+                    pass
+                else:
+                    raise Exception('getConnectionsSet', 'wrong behavior name: ' + name)
+
+#                if not c.component_from.strip():
+#                    conn_tuple = ("abcdefghijkl", c.component_to)
+#                elif not c.component_to.strip():
+#                    conn_tuple = (c.component_from, "abcdefghijkl")
+#                else:
+
+                if not c.unconnected:
+                    conn_tuple = (c.component_from, c.component_to)
+                else:
+                    if not c.component_from.strip():
+                        conn_tuple = (None, c.component_to)
+                    else:
+                        conn_tuple = (c.component_from, None)
+
+                if c.name:
+                    cname = c.name
+                elif c.port_from.strip():
+                    cname = c.port_from
+                    if not c.unconnected and cname.endswith("_OUTPORT"):
+                        cname = cname[:-8]
+                else:
+                    cname = c.port_to
+                    if not c.unconnected and cname.endswith("_INPORT"):
+                        cname = cname[:-7]
+
+#                if not cname:
+#                    continue
+                if conn_tuple in conn_set:
+                    conn_set[conn_tuple] = conn_set[conn_tuple] + "\\n" + cname
+                else:
+                    conn_set[conn_tuple] = cname
+            return conn_set
+
     def update_subsystem(self, msg):
         for value in msg.status[1].values:
             if value.key == 'master_component':
@@ -620,55 +740,49 @@ class SubsystemWidget(QWidget):
                     self.all_buffers[value.key[:-2]].setToolTip(value.value)
 
         if self.graph == None and self.initialized:
-            conn_set = set()
 
-            print self.subsystem_info.behaviors
+            draw_unconnected = False
 
-            sw_comp = set()
-            for b in self.subsystem_info.behaviors:
-                for r in b.running_components:
-                    sw_comp.add(r)
+            self.all_connections = []
+            for conn in self.subsystem_info.connections:
+                self.all_connections.append( (conn.component_from, conn.port_from, conn.component_to, conn.port_to) )
 
-            all_comp = set()
-            for comp in self.subsystem_info.components:
-                all_comp.add(comp.name)
+            graphs_list = ["<all>", "<always running>"]
+            for behavior in self.subsystem_info.behaviors:
+                graphs_list.append(behavior.name)
 
-            always_running = all_comp - sw_comp
-            print "always_running", always_running
+            for graph_name in graphs_list:
+                conn_set = self.getConnectionsSet(graph_name)
 
-            current_running = set()
-            behavior_idx = 3
-            for r in self.subsystem_info.behaviors[behavior_idx].running_components:
-                current_running.add(r)
+                dot = "digraph " + self.subsystem_name + " {\n"
+                for c in conn_set:
+                    conn = conn_set[c]
+                    if c[0] == None:
+                        if draw_unconnected:
+                            dot += "\"" + c[1] + "_unconnected_in\" [shape=point label=\"\"];\n"
+                            dot += c[1] + "_unconnected_in -> " + c[1] + " [label=\"" + conn + "\"];\n"
+                    elif c[1] == None:
+                        if draw_unconnected:
+                            dot += "\"" + c[0] + "_unconnected_out\" [shape=point label=\"\"];\n"
+                            dot += c[0] + " -> " + c[0] + "_unconnected_out [label=\"" + conn + "\"];\n"
+                    else:
+                        dot += c[0] + " -> " + c[1] + " [label=\"" + conn + "\"];\n"
+                dot += "}\n"
 
-            other_behaviors_comp = sw_comp - current_running
-            running = always_running.union(current_running)
+#                print graph_name, dot
+                in_read, in_write = os.pipe()
+                os.write(in_write, dot)
+                os.close(in_write)
 
-            for c in self.subsystem_info.connections:
-                if (not c.component_from.strip()) or (not c.component_to.strip()):
-                    continue
-                if (not c.component_from in current_running) and (not c.component_to in current_running):
-                    continue
-                if c.component_from in other_behaviors_comp or c.component_to in other_behaviors_comp:
-                    continue
-                conn_set.add( (c.component_from, c.component_to) )
+                out_read, out_write = os.pipe()
+                subprocess.call(['dot', '-Tplain'], stdin=in_read, stdout=out_write)
+                graph_str = os.read(out_read, 1000000)
+                os.close(out_read)
+                graph_str = graph_str.replace("\\\n", "")
+#                print graph_name, graph_str
 
-            dot = "digraph " + self.subsystem_name + " {\n"
-            for c in conn_set:
-                dot += c[0] + " -> " + c[1] + ";\n"
-            dot += "}\n"
-
-
-            in_read, in_write = os.pipe()
-            os.write(in_write, dot)
-            os.close(in_write)
-
-            out_read, out_write = os.pipe()
-            subprocess.call(['dot', '-Tplain'], stdin=in_read, stdout=out_write)
-            graph_str = os.read(out_read, 1000000)
-            os.close(out_read)
-
-            self.dialogGraph.drawGraph(graph_str)
+                self.dialogGraph.addGraph(graph_name, graph_str)
+            self.dialogGraph.showGraph("<all>")
             self.graph = True
 
         # iterate through components and add them to QListWidget
