@@ -36,9 +36,10 @@ import math
 import subprocess
 
 from python_qt_binding import loadUi
-from python_qt_binding.QtCore import Qt, QTimer, Signal, Slot, QRectF, QPointF
+from python_qt_binding.QtCore import Qt, QTimer, Signal, Slot, QRectF, QPointF, QSize, QRect
 from python_qt_binding.QtWidgets import QWidget, QPushButton, QVBoxLayout, QHBoxLayout, QLabel, QListWidgetItem, QDialog, QGraphicsView, QGraphicsScene, QGraphicsEllipseItem, QGraphicsPathItem, QTableWidgetItem
-from python_qt_binding.QtGui import QColor, QPen, QBrush, QPainterPath, QPolygonF, QTransform
+from python_qt_binding.QtGui import QColor, QPen, QBrush, QPainterPath, QPolygonF, QTransform, QPainter
+from python_qt_binding.QtSvg import QSvgGenerator
 import roslib
 import rospkg
 import rospy
@@ -380,6 +381,18 @@ class MyDialog(QDialog):
                     label_item = self.scene[graph_name].addSimpleText(label_text)
                     br = label_item.boundingRect()
                     label_item.setPos(label_pos.x() - br.width()/2, label_pos.y() - br.height()/2)
+
+        svgGen = QSvgGenerator()
+
+        svgGen.setFileName( graph_name + ".svg" )
+        svgGen.setSize(QSize(self.scX(self.width), self.scY(self.height)))
+        svgGen.setViewBox(QRect(0, 0, self.scX(self.width), self.scY(self.height)))
+        svgGen.setTitle("SVG Generator Example Drawing")
+        svgGen.setDescription("An SVG drawing created by the SVG Generator Example provided with Qt.")
+
+        painter = QPainter( svgGen )
+        self.scene[graph_name].render( painter );
+        del painter
 
     @Slot()
     def closeClick(self):
