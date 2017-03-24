@@ -779,7 +779,9 @@ class SubsystemWidget(QWidget):
                             dot += "\"" + c[0] + "_unconnected_out\" [shape=point label=\"\"];\n"
                             dot += c[0] + " -> " + c[0] + "_unconnected_out [label=\"" + conn + "\"];\n"
                     else:
-                        dot += c[0] + " -> " + c[1] + " [label=\"" + conn + "\"];\n"
+                        # ignore loops (port conversions)
+                        if c[0] != c[1]:
+                            dot += c[0] + " -> " + c[1] + " [label=\"" + conn + "\"];\n"
                 dot += "}\n"
 
 #                print graph_name, dot
