@@ -147,7 +147,7 @@ class SystemWidget(QWidget):
         """
         This method needs to be called to start updating topic pane.
         """
-        self._timer_refresh_topics.start(1000)
+        self._timer_refresh_topics.start(100)
 
     def generateStructure(self):
         names = []

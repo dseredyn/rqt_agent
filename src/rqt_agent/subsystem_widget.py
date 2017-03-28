@@ -36,9 +36,9 @@ import math
 import subprocess
 
 from python_qt_binding import loadUi
-from python_qt_binding.QtCore import Qt, QTimer, Signal, Slot, QRectF, QPointF, QSize, QRect
-from python_qt_binding.QtWidgets import QWidget, QPushButton, QVBoxLayout, QHBoxLayout, QLabel, QListWidgetItem, QDialog, QGraphicsView, QGraphicsScene, QGraphicsEllipseItem, QGraphicsPathItem, QTableWidgetItem
-from python_qt_binding.QtGui import QColor, QPen, QBrush, QPainterPath, QPolygonF, QTransform, QPainter
+from python_qt_binding.QtCore import Qt, QTimer, Signal, Slot, QRectF, QPointF, QSize, QRect, QPoint
+from python_qt_binding.QtWidgets import QWidget, QPushButton, QVBoxLayout, QHBoxLayout, QLabel, QListWidgetItem, QDialog, QGraphicsView, QGraphicsScene, QGraphicsEllipseItem, QGraphicsPathItem, QTableWidgetItem, QHeaderView, QStyle, QCommonStyle
+from python_qt_binding.QtGui import QColor, QPen, QBrush, QPainterPath, QPolygonF, QTransform, QPainter, QIcon, QPixmap, QPaintEvent, QPalette
 from python_qt_binding.QtSvg import QSvgGenerator
 import roslib
 import rospkg
@@ -457,6 +457,49 @@ class StateHistoryDialog(QDialog):
     def closeClick(self):
         self.close()
 
+    class MyStyle(QCommonStyle):
+        def drawControl (self, element, opt, painter, widget=None):
+
+#            print element
+            if element == QStyle.CE_HeaderLabel:
+                hv = widget
+#                if not hv or hv.orientation() != Qt.Horizontal:
+#                    return super(StateHistoryDialog.MyStyle, self).drawControl(element, opt, p, widget)
+                header = opt
+
+                if header.section < 3:
+                    return super(StateHistoryDialog.MyStyle, self).drawControl(element, opt, painter, widget)
+
+                painter.save()
+                #// painter->translate(header->rect.topLeft())
+                rect = header.rect.bottomLeft()
+                painter.translate(QPoint(rect.x() + 10, rect.y() + 5))
+#                print "drawControl"
+                painter.rotate(-90)
+                painter.drawText(0,0,header.text)
+                painter.restore()
+                return
+#            return QProxyStyle::drawControl(element, option, painter, widget);
+#            print "drawControl"
+            return super(StateHistoryDialog.MyStyle, self).drawControl(element, opt, painter, widget)
+
+#        def drawItemText( painter, rectangle, alignment, palette, enabled, text, textRole = QPalette.NoRole):
+#            pass
+
+    class MyHorizHeader(QHeaderView):
+        def __init__(self, parent=None):
+            super(StateHistoryDialog.MyHorizHeader, self).__init__(Qt.Horizontal, parent)
+            style = StateHistoryDialog.MyStyle()
+            self.setStyle(style)
+
+        def sizeHint(self):
+            # Get the base implementation size.
+            baseSize = super(StateHistoryDialog.MyHorizHeader, self).sizeHint()
+            # Override the height with a custom value.
+            baseSize.setHeight( 150 );
+#            baseSize.setWidth( 20 );
+            return baseSize;
+
     def __init__(self, subsystem_name, parent=None):
         super(StateHistoryDialog, self).__init__(parent)
 
@@ -472,18 +515,67 @@ class StateHistoryDialog(QDialog):
 
         self.pushButton_close.clicked.connect(self.closeClick)
 
+        hdr = self.MyHorizHeader(self.tableWidget)
+        hdr.setMinimumSectionSize(40)
+        hdr.setDefaultSectionSize(40)
+        self.tableWidget.setHorizontalHeader(hdr)
+
+        self.initialized = False
+        item0 = QTableWidgetItem("behavior")
+        item1 = QTableWidgetItem("reason")
+        item2 = QTableWidgetItem("time")
+        self.tableWidget.setHorizontalHeaderItem (0, item0)
+        self.tableWidget.setHorizontalHeaderItem (1, item1)
+        self.tableWidget.setHorizontalHeaderItem (2, item2)
+        self.tableWidget.setColumnWidth(0, 100)
+        self.tableWidget.setColumnWidth(1, 50)
+        self.tableWidget.setColumnWidth(2, 75)
+
     def updateState(self, mcd):
         hist = mcd[0]
         if self.tableWidget.rowCount() != len(hist):
             self.tableWidget.setRowCount( len(hist) )
         row = 0
-        for ss in hist:
-            for col in range(4):
-                self.tableWidget.setItem(row, col, QTableWidgetItem(ss[col]))
-#                item.setText( ss[col] )
-            row = row + 1
-        self.labelCurrentPredicates.setText(mcd[1])
+        curr_pred = mcd[1].split(",")
+        curr_pred_v = []
+        for cp in curr_pred:
+            k_v = cp.split(":")
+            if len(k_v) == 2:
+                curr_pred_v.append(k_v[1])
 
+        for ss in hist:
+            for col in range(3):
+                self.tableWidget.setItem(row, col, QTableWidgetItem(ss[col]))
+            pred = ss[3].split(",")
+
+            if not self.initialized:
+                self.initialized = True
+                predicates = []
+                for p in pred:
+                    k_v = p.split(":")
+                    if len(k_v) != 2:
+                        continue
+                    predicates.append( k_v[0] )
+
+                self.tableWidget.setColumnCount(len(predicates))
+                idx = 3
+                for p in predicates:
+                    item = QTableWidgetItem(p)
+                    self.tableWidget.setHorizontalHeaderItem(idx, item)
+                    idx += 1
+
+            idx = 0
+            for p in pred:
+                k_v = p.split(":")
+                if len(k_v) != 2:
+                    continue
+                if row == 0:
+                    self.tableWidget.setItem(row, 3+idx, QTableWidgetItem(k_v[1] + " ("+curr_pred_v[idx]+")"))
+                else:
+                    self.tableWidget.setItem(row, 3+idx, QTableWidgetItem(k_v[1]))
+                idx += 1
+                
+            row = row + 1
 
 class SubsystemWidget(QWidget):
     """
