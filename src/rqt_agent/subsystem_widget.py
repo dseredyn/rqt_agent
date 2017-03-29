@@ -382,17 +382,15 @@ class MyDialog(QDialog):
                     br = label_item.boundingRect()
                     label_item.setPos(label_pos.x() - br.width()/2, label_pos.y() - br.height()/2)
 
-        svgGen = QSvgGenerator()
-
-        svgGen.setFileName( graph_name + ".svg" )
-        svgGen.setSize(QSize(self.scX(self.width), self.scY(self.height)))
-        svgGen.setViewBox(QRect(0, 0, self.scX(self.width), self.scY(self.height)))
-        svgGen.setTitle("SVG Generator Example Drawing")
-        svgGen.setDescription("An SVG drawing created by the SVG Generator Example provided with Qt.")
-
-        painter = QPainter( svgGen )
-        self.scene[graph_name].render( painter );
-        del painter
+#        svgGen = QSvgGenerator()
+#        svgGen.setFileName( graph_name + ".svg" )
+#        svgGen.setSize(QSize(self.scX(self.width), self.scY(self.height)))
+#        svgGen.setViewBox(QRect(0, 0, self.scX(self.width), self.scY(self.height)))
+#        svgGen.setTitle("SVG Generator Example Drawing")
+#        svgGen.setDescription("An SVG drawing created by the SVG Generator Example provided with Qt.")
+#        painter = QPainter( svgGen )
+#        self.scene[graph_name].render( painter );
+#        del painter
 
     @Slot()
     def closeClick(self):
@@ -858,7 +856,6 @@ class SubsystemWidget(QWidget):
 
             for graph_name in graphs_list:
                 conn_set = self.getConnectionsSet(graph_name)
-
                 dot = "digraph " + self.subsystem_name + " {\n"
                 for c in conn_set:
                     conn = conn_set[c]
@@ -887,6 +884,12 @@ class SubsystemWidget(QWidget):
                 os.close(out_read)
                 graph_str = graph_str.replace("\\\n", "")
 #                print graph_name, graph_str
+
+                # generate pdf
+                in_read, in_write = os.pipe()
+                os.write(in_write, dot)
+                os.close(in_write)
+                subprocess.call(['dot', '-Tpdf', '-o'+graph_name+'.pdf'], stdin=in_read)
 
                 self.dialogGraph.addGraph(graph_name, graph_str)
             self.dialogGraph.showGraph("<all>")
