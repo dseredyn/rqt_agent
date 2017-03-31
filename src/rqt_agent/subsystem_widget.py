@@ -46,6 +46,7 @@ import rospy
 from rospy.exceptions import ROSException
 
 import xml.dom.minidom as minidom
+import tempfile
 
 from rqt_topic.topic_info import TopicInfo
 
@@ -755,6 +756,9 @@ class SubsystemWidget(QWidget):
 
         return (ss_history, curr_pred, ret_period)
 
+    def getShownComponents(self, name):
+# TODO
+
     def getConnectionsSet(self, name):
             behavior = None
             for b in self.subsystem_info.behaviors:
@@ -822,13 +826,22 @@ class SubsystemWidget(QWidget):
                     if not c.unconnected and cname.endswith("_INPORT"):
                         cname = cname[:-7]
 
+                latex_name = c.latex
+                if not latex_name:
+                    #latex_name = '\\text{' + cname + '}'
+                    latex_name = None
 #                if not cname:
 #                    continue
                 if conn_tuple in conn_set:
-                    conn_set[conn_tuple] = conn_set[conn_tuple] + "\\n" + cname
+                    #conn_set[conn_tuple] = conn_set[conn_tuple] + "\\n" + cname
+                    conn_set[conn_tuple][0].append(cname)
+                    conn_set[conn_tuple][1].append(latex_name)
                 else:
-                    conn_set[conn_tuple] = cname
+                    conn_set[conn_tuple] = [[cname], [latex_name]]
             return conn_set
+
+#    def generateLatexFormulaEps(self, latex):
+
 
     def update_subsystem(self, msg):
         for value in msg.status[1].values:
@@ -857,21 +870,113 @@ class SubsystemWidget(QWidget):
             for graph_name in graphs_list:
                 conn_set = self.getConnectionsSet(graph_name)
                 dot = "digraph " + self.subsystem_name + " {\n"
+                dot_pdf = "digraph " + self.subsystem_name + " {\n"
+                latex_formulas = []
+
+                in_read, in_write = os.pipe()
+                os.write(in_write, "\\documentclass{minimal}\n")
+                os.write(in_write, "\\usepackage{amsmath}\n")
+                os.write(in_write, "\\usepackage{mathtools}\n")
+                os.write(in_write, "\\begin{document}\n")
+
+                new_page = False
+                shown_components = set()
                 for c in conn_set:
                     conn = conn_set[c]
+                    conn_str = ''
+                    sep = ''
+                    for cname in conn[0]:
+                        conn_str += sep + cname
+                        sep = '\\n'
+                    conn_pdf = ''
+                    sep = ''
+                    for latex in conn[1]:
+                        if not latex:
+                            continue
+                        conn_pdf += sep + latex
+                        sep = ' \\\\ '
+
+                    if new_page:
+                        os.write(in_write, "\\clearpage\n")
+                    new_page = True
+#                    print "conn_pdf: \"", conn_pdf, "\""
+                    os.write(in_write, "\\begin{gather*}" + conn_pdf + "\\end{gather*}\n")
+
+#                    subprocess.call(['latex', '-output-directory=/tmp'], stdin=in_read)
+#                    subprocess.call(['dvips', '/tmp/texput.dvi', '-o', '/tmp/texput.ps'])
+#                    subprocess.call(['ps2eps', '/tmp/texput.ps', '-f'])
+#                    with open('/tmp/texput.eps', 'r') as infile:
+#                        data = infile.read()
+                    handle, path = tempfile.mkstemp(suffix=".eps")
+#                    with open(path, 'w') as outfile:
+#                        outfile.write(data)
+#                    os.close(handle)
+                    conn_eps = path
+                    latex_formulas.append( (handle, path) )
+
+#dvips symbol.dvi
+#ps2eps symbol.ps
+#dot -Teps -oout.eps graph.txt -v
+
                     if c[0] == None:
+                        shown_components.add(c[1])
                         if draw_unconnected:
-                            dot += "\"" + c[1] + "_unconnected_in\" [shape=point label=\"\"];\n"
-                            dot += c[1] + "_unconnected_in -> " + c[1] + " [label=\"" + conn + "\"];\n"
+                            dot     += "\"" + c[1] + "_unconnected_in\" [shape=point label=\"\"];\n"
+                            dot     += c[1] + "_unconnected_in -> " + c[1] + " [label=\"" + conn_str + "\"];\n"
+                            dot_pdf += "\"" + c[1] + "_unconnected_in\" [shape=point label=\"\"];\n"
+                            dot_pdf += c[1] + "_unconnected_in -> " + c[1] + " [label=<<TABLE BORDER=\"0\"><TR><TD><IMG src=\"" + conn_eps + "\"/></TD></TR></TABLE>>];\n"
                     elif c[1] == None:
+                        shown_components.add(c[0])
                         if draw_unconnected:
-                            dot += "\"" + c[0] + "_unconnected_out\" [shape=point label=\"\"];\n"
-                            dot += c[0] + " -> " + c[0] + "_unconnected_out [label=\"" + conn + "\"];\n"
+                            dot     += "\"" + c[0] + "_unconnected_out\" [shape=point label=\"\"];\n"
+                            dot     += c[0] + " -> " + c[0] + "_unconnected_out [label=\"" + conn_str + "\"];\n"
+                            dot_pdf += "\"" + c[0] + "_unconnected_out\" [shape=point label=\"\"];\n"
+                            dot_pdf += c[0] + " -> " + c[0] + "_unconnected_out [label=<<TABLE BORDER=\"0\"><TR><TD><IMG src=\"" + conn_eps + "\"/></TD></TR></TABLE>>];\n"
                     else:
                         # ignore loops (port conversions)
+                        shown_components.add(c[0])
+                        shown_components.add(c[1])
                         if c[0] != c[1]:
-                            dot += c[0] + " -> " + c[1] + " [label=\"" + conn + "\"];\n"
-                dot += "}\n"
+                            dot     += c[0] + " -> " + c[1] + " [label=\"" + conn_str + "\"];\n"
+                            dot_pdf += c[0] + " -> " + c[1] + " [label=<<TABLE BORDER=\"0\"><TR><TD><IMG src=\"" + conn_eps + "\"/></TD></TR></TABLE>>];\n"
+
+# TODO:set only shown components
+                for c in self.subsystem_info.components:
+                    if not c.name in
+                    if not c.latex:
+                        continue
+                    if new_page:
+                        os.write(in_write, "\\clearpage\n")
+                    new_page = True
+                    os.write(in_write, "\\begin{gather*}" + c.latex + "\\end{gather*}\n")
+                    handle, path = tempfile.mkstemp(suffix=".eps")
+                    comp_eps = path
+                    latex_formulas.append( (handle, path) )
+                    #dot     += c.name + [label=\"" + conn_str + "\"];\n"
+                    dot_pdf += c.name + " [label=\"\"; image=\"" + comp_eps + "\"];\n"
+
+
+                dot     += "}\n"
+                dot_pdf += "}\n"
+
+                os.write(in_write, "\\end{document}\n")
+                os.close(in_write)
+
+                # generate dvi file from latex document
+                subprocess.call(['latex', '-output-directory=/tmp'], stdin=in_read)
+
+                page_num = 1
+                for (handle, path) in latex_formulas:
+                    subprocess.call(['dvips', '/tmp/texput.dvi', '-pp', str(page_num), '-o', '/tmp/texput.ps'])
+                    subprocess.call(['ps2eps', '/tmp/texput.ps', '-f'])
+                    with open('/tmp/texput.eps', 'r') as infile:
+                        data = infile.read()
+#                    handle, path = tempfile.mkstemp(suffix=".eps")
+                    with open(path, 'w') as outfile:
+                        outfile.write(data)
+                    os.close(handle)
+                    page_num += 1
+
 
 #                print graph_name, dot
                 in_read, in_write = os.pipe()
@@ -885,11 +990,19 @@ class SubsystemWidget(QWidget):
                 graph_str = graph_str.replace("\\\n", "")
 #                print graph_name, graph_str
 
+#                for 
                 # generate pdf
+                print dot_pdf
                 in_read, in_write = os.pipe()
-                os.write(in_write, dot)
+                os.write(in_write, dot_pdf)
                 os.close(in_write)
-                subprocess.call(['dot', '-Tpdf', '-o'+graph_name+'.pdf'], stdin=in_read)
+                subprocess.call(['dot', '-Teps', '-o'+graph_name+'.eps'], stdin=in_read)
+
+                for (handle, file_name) in latex_formulas:
+                    os.remove(file_name)
+                os.remove('/tmp/texput.dvi')
+                os.remove('/tmp/texput.ps')
+                os.remove('/tmp/texput.eps')
 
                 self.dialogGraph.addGraph(graph_name, graph_str)
             self.dialogGraph.showGraph("<all>")
