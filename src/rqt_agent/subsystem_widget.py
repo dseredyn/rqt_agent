@@ -572,7 +572,7 @@ class StateHistoryDialog(QDialog):
                         continue
                     predicates.append( k_v[0] )
 
-                self.tableWidget.setColumnCount(len(predicates))
+                self.tableWidget.setColumnCount(len(predicates)+3)
                 idx = 3
                 for p in predicates:
                     item = QTableWidgetItem(p)
