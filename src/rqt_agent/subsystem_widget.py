@@ -270,9 +270,9 @@ class SubsystemWidget(QWidget):
                         continue
                     if c.component_from in other_behaviors_comp or c.component_to in other_behaviors_comp:
                         continue
-                elif name == "<always running>":
-                    if (not c.component_from in always_running) or (not c.component_to in always_running):
-                        continue
+#                elif name == "<always running>":
+#                    if (not c.component_from in always_running) or (not c.component_to in always_running):
+#                        continue
                 elif name == "<all>":
                     pass
                 else:
@@ -371,7 +371,7 @@ class SubsystemWidget(QWidget):
 
 
     def exportGraphs(self):
-        graphs_list = ["<all>", "<always running>"]
+        graphs_list = ["<all>"]#, "<always running>"]
         for behavior in self.subsystem_info.behaviors:
             graphs_list.append(behavior.name)
 
@@ -394,45 +394,52 @@ class SubsystemWidget(QWidget):
             new_page = False
             shown_components = set()
             for c in conn_set:
+                if not draw_unconnected and (not c[0] or not c[1]):
+                    continue
+                if c[0] == c[1]:
+                    continue
                 conn = conn_set[c]
-                conn_str = ''
-                sep = ''
-                for cname in conn[0]:
-                    conn_str += sep + cname
-                    sep = '\\n'
-                conn_latex = ''
-                sep = ''
-                for latex in conn[1]:
-                    if not latex:
-                        continue
-                    conn_latex += sep + latex
-                    sep = ' \\\\ '
+                if use_latex:
+                    conn_latex = ''
+                    sep = ''
+                    for i in range(len(conn[1])):
+                        latex = conn[1][i]
+                        if not latex:
+                            latex = '\\text{' + conn[0][i].replace('_', '\_') + '}'
+                        conn_latex += sep + latex
+                        sep = ' \\\\ '
 
-                if conn_latex in latex_formulas:
-                    handle, path = eps_file_list[latex_formulas.index(conn_latex)]
+                    if conn_latex in latex_formulas:
+                        handle, path = eps_file_list[latex_formulas.index(conn_latex)]
+                    else:
+                        handle, path = tempfile.mkstemp(suffix=".eps")
+                        eps_file_list.append( (handle, path) )
+                        latex_formulas.append( conn_latex )
                 else:
-                    handle, path = tempfile.mkstemp(suffix=".eps")
-                    eps_file_list.append( (handle, path) )
-                    latex_formulas.append( conn_latex )
+                    conn_str = ''
+                    sep = ''
+                    for cname in conn[0]:
+                        conn_str += sep + cname
+                        sep = '\\n'
 
                 if c[0] == None:
                     shown_components.add(c[1])
-                    if draw_unconnected:
-                        if use_latex:
-                            dot += "\"" + c[1] + "_unconnected_in\" [shape=point label=\"\"];\n"
-                            dot += c[1] + "_unconnected_in -> " + c[1] + " [label=<<TABLE BORDER=\"0\"><TR><TD><IMG src=\"" + path + "\"/></TD></TR></TABLE>>];\n"
-                        else:
-                            dot += "\"" + c[1] + "_unconnected_in\" [shape=point label=\"\"];\n"
-                            dot += c[1] + "_unconnected_in -> " + c[1] + " [label=\"" + conn_str + "\"];\n"
+#                    if draw_unconnected:
+                    if use_latex:
+                        dot += "\"" + c[1] + "_unconnected_in\" [shape=point label=\"\"];\n"
+                        dot += c[1] + "_unconnected_in -> " + c[1] + " [label=<<TABLE BORDER=\"0\"><TR><TD><IMG src=\"" + path + "\"/></TD></TR></TABLE>>];\n"
+                    else:
+                        dot += "\"" + c[1] + "_unconnected_in\" [shape=point label=\"\"];\n"
+                        dot += c[1] + "_unconnected_in -> " + c[1] + " [label=\"" + conn_str + "\"];\n"
                 elif c[1] == None:
                     shown_components.add(c[0])
-                    if draw_unconnected:
-                        if use_latex:
-                            dot += "\"" + c[0] + "_unconnected_out\" [shape=point label=\"\"];\n"
-                            dot += c[0] + " -> " + c[0] + "_unconnected_out [label=<<TABLE BORDER=\"0\"><TR><TD><IMG src=\"" + path + "\"/></TD></TR></TABLE>>];\n"
-                        else:
-                            dot += "\"" + c[0] + "_unconnected_out\" [shape=point label=\"\"];\n"
-                            dot += c[0] + " -> " + c[0] + "_unconnected_out [label=\"" + conn_str + "\"];\n"
+#                    if draw_unconnected:
+                    if use_latex:
+                        dot += "\"" + c[0] + "_unconnected_out\" [shape=point label=\"\"];\n"
+                        dot += c[0] + " -> " + c[0] + "_unconnected_out [label=<<TABLE BORDER=\"0\"><TR><TD><IMG src=\"" + path + "\"/></TD></TR></TABLE>>];\n"
+                    else:
+                        dot += "\"" + c[0] + "_unconnected_out\" [shape=point label=\"\"];\n"
+                        dot += c[0] + " -> " + c[0] + "_unconnected_out [label=\"" + conn_str + "\"];\n"
                 else:
                     # ignore loops (port conversions)
                     shown_components.add(c[0])
@@ -460,6 +467,7 @@ class SubsystemWidget(QWidget):
 
             dot     += "}\n"
 
+            print "latex_formulas", latex_formulas
             return dot, eps_file_list, latex_formulas
 
     def update_subsystem(self, msg):
@@ -482,7 +490,7 @@ class SubsystemWidget(QWidget):
             for conn in self.subsystem_info.connections:
                 all_connections.append( (conn.component_from, conn.port_from, conn.component_to, conn.port_to) )
 
-            graphs_list = ["<all>", "<always running>"]
+            graphs_list = ["<all>"]#, "<always running>"]
             for behavior in self.subsystem_info.behaviors:
                 graphs_list.append(behavior.name)
 
