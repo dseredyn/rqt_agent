@@ -557,12 +557,8 @@ class SubsystemWidget(QWidget):
         common_buffers = None
         for this_index in range(len(self.subsystem_info.upper_inputs)):
             up_in = self.subsystem_info.upper_inputs[this_index]
-            if not self.subsystem_info.upper_inputs_ipc[this_index]:
-                continue
             for index in range(len(subsystem.subsystem_info.lower_outputs)):
                 lo_out = subsystem.subsystem_info.lower_outputs[index]
-                if not subsystem.subsystem_info.lower_outputs_ipc[index]:
-                    continue
                 if up_in == lo_out:
                     if common_buffers == None:
                         common_buffers = []
@@ -570,12 +566,8 @@ class SubsystemWidget(QWidget):
 
         for this_index in range(len(self.subsystem_info.upper_outputs)):
             up_out = self.subsystem_info.upper_outputs[this_index]
-            if not self.subsystem_info.upper_outputs_ipc[this_index]:
-                continue
             for index in range(len(subsystem.subsystem_info.lower_inputs)):
                 lo_in = subsystem.subsystem_info.lower_inputs[index]
-                if not subsystem.subsystem_info.lower_inputs_ipc[index]:
-                    continue
                 if up_out == lo_in:
                     if common_buffers == None:
                         common_buffers = []
