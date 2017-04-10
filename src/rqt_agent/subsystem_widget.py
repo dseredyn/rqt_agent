@@ -369,6 +369,9 @@ class SubsystemWidget(QWidget):
         os.remove('/tmp/texput.ps')
         os.remove('/tmp/texput.eps')
 
+        subprocess.call(['epspdf', graph_name+'.eps', graph_name+'.pdf'], stdin=in_read)
+        os.remove(graph_name+'.eps')
+
 
     def exportGraphs(self):
         graphs_list = ["<all>"]#, "<always running>"]
@@ -384,9 +387,9 @@ class SubsystemWidget(QWidget):
 
             draw_unconnected = False
 
-            all_connections = []
+            self.all_connections = []
             for conn in self.subsystem_info.connections:
-                all_connections.append( (conn.component_from, conn.port_from, conn.component_to, conn.port_to) )
+                self.all_connections.append( (conn.component_from, conn.port_from, conn.component_to, conn.port_to) )
 
             conn_set = self.getConnectionsSet(graph_name)
             dot = "digraph " + self.subsystem_name + " {\n"
@@ -486,9 +489,9 @@ class SubsystemWidget(QWidget):
 
             draw_unconnected = False
 
-            all_connections = []
+            self.all_connections = []
             for conn in self.subsystem_info.connections:
-                all_connections.append( (conn.component_from, conn.port_from, conn.component_to, conn.port_to) )
+                self.all_connections.append( (conn.component_from, conn.port_from, conn.component_to, conn.port_to) )
 
             graphs_list = ["<all>"]#, "<always running>"]
             for behavior in self.subsystem_info.behaviors:

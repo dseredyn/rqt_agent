@@ -35,15 +35,13 @@ import os
 
 from python_qt_binding import loadUi
 from python_qt_binding.QtCore import Qt, QTimer, Signal, Slot
-from python_qt_binding.QtWidgets import QHeaderView, QMenu, QWidget, QVBoxLayout, QLabel, QPushButton, QHBoxLayout, QScrollArea
-#from PyQt5 import QtCore, QtGui, QtWidgets
+from python_qt_binding.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton, QHBoxLayout, QScrollArea
 import roslib
 import rospkg
 import rospy
 from rospy.exceptions import ROSException
 
 from .topic_info import TopicInfo
-#from rqt_topic.topic_info import TopicInfo
 from .subsystem_widget import SubsystemWidget
 
 class SystemWidget(QWidget):
@@ -55,43 +53,19 @@ class SystemWidget(QWidget):
     SystemWidget.start must be called in order to update topic pane.
     """
 
-    SELECT_BY_NAME = 0
-    SELECT_BY_MSGTYPE = 1
-
     _column_names = ['topic', 'type', 'bandwidth', 'rate', 'value']
 
-    def __init__(self, plugin=None, selected_topics=None, select_topic_type=SELECT_BY_NAME):
+    def __init__(self, plugin=None):
         """
-        @type selected_topics: list of tuples.
-        @param selected_topics: [($NAME_TOPIC$, $TYPE_TOPIC$), ...]
-        @type select_topic_type: int
-        @param select_topic_type: Can specify either the name of topics or by
-                                  the type of topic, to filter the topics to
-                                  show. If 'select_topic_type' argument is
-                                  None, this arg shouldn't be meaningful.
         """
         super(SystemWidget, self).__init__()
-
-#        levels_layout = QVBoxLayout()
-
-#        self._select_topic_type = select_topic_type
 
         rp = rospkg.RosPack()
         ui_file = os.path.join(rp.get_path('rqt_agent'), 'resource', 'SystemWidget.ui')
         loadUi(ui_file, self)
 
         self._plugin = plugin
-#        self.topics_tree_widget.sortByColumn(0, Qt.AscendingOrder)
-#        header = self.topics_tree_widget.header()
-#        header.setResizeMode(QHeaderView.ResizeToContents)
-#        header.customContextMenuRequested.connect(self.handle_header_view_customContextMenuRequested)
-#        header.setContextMenuPolicy(Qt.CustomContextMenu)
 
-        # Whether to get all topics or only the topics that are set in advance.
-        # Can be also set by the setter method "set_selected_topics".
-#        self._selected_topics = selected_topics
-
-#        self._current_topic_list = []
         self._subsystems = {}
 
         self.all_subsystems = {}
@@ -366,79 +340,6 @@ class SystemWidget(QWidget):
 
         for subsystem_name in self._widgets:
             self._widgets[subsystem_name].update_subsystem(self._subsystems[subsystem_name].last_message)
-
-
-    def update_value(self, topic_name, message):
-        if hasattr(message, '__slots__') and hasattr(message, '_slot_types'):
-            for slot_name in message.__slots__:
-                self.update_value(topic_name + '/' + slot_name, getattr(message, slot_name))
-
-        elif type(message) in (list, tuple) and (len(message) > 0) and hasattr(message[0], '__slots__'):
-
-            for index, slot in enumerate(message):
-                if topic_name + '[%d]' % index in self._tree_items:
-                    self.update_value(topic_name + '[%d]' % index, slot)
-                else:
-                    base_type_str, _ = self._extract_array_info(self._tree_items[topic_name].text(self._column_index['type']))
-                    self._recursive_create_widget_items(self._tree_items[topic_name], topic_name + '[%d]' % index, base_type_str, slot)
-            # remove obsolete children
-            if len(message) < self._tree_items[topic_name].childCount():
-                for i in range(len(message), self._tree_items[topic_name].childCount()):
-                    item_topic_name = topic_name + '[%d]' % i
-                    self._recursive_delete_widget_items(self._tree_items[item_topic_name])
-        else:
-            if topic_name in self._tree_items:
-                self._tree_items[topic_name].setText(self._column_index['value'], repr(message))
-
-    def _extract_array_info(self, type_str):
-        array_size = None
-        if '[' in type_str and type_str[-1] == ']':
-            type_str, array_size_str = type_str.split('[', 1)
-            array_size_str = array_size_str[:-1]
-            if len(array_size_str) > 0:
-                array_size = int(array_size_str)
-            else:
-                array_size = 0
-
-        return type_str, array_size
-
-    @Slot('QPoint')
-    def handle_header_view_customContextMenuRequested(self, pos):
-        header = self.topics_tree_widget.header()
-
-        # show context menu
-        menu = QMenu(self)
-        action_toggle_auto_resize = menu.addAction('Toggle Auto-Resize')
-        action = menu.exec_(header.mapToGlobal(pos))
-
-        # evaluate user action
-        if action is action_toggle_auto_resize:
-            if header.resizeMode(0) == QHeaderView.ResizeToContents:
-                header.setResizeMode(QHeaderView.Interactive)
-            else:
-                header.setResizeMode(QHeaderView.ResizeToContents)
-
-    @Slot('QPoint')
-    def on_topics_tree_widget_customContextMenuRequested(self, pos):
-        item = self.topics_tree_widget.itemAt(pos)
-        if item is None:
-            return
-
-        # show context menu
-        menu = QMenu(self)
-        action_item_expand = menu.addAction(QIcon.fromTheme('zoom-in'), 'Expand All Children')
-        action_item_collapse = menu.addAction(QIcon.fromTheme('zoom-out'), 'Collapse All Children')
-        action = menu.exec_(self.topics_tree_widget.mapToGlobal(pos))
-
-        # evaluate user action
-        if action in (action_item_expand, action_item_collapse):
-            expanded = (action is action_item_expand)
-
-            def recursive_set_expanded(item):
-                item.setExpanded(expanded)
-                for index in range(item.childCount()):
-                    recursive_set_expanded(item.child(index))
-            recursive_set_expanded(item)
 
     def shutdown_plugin(self):
         for topic in self._topics.values():
