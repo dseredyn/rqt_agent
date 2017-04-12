@@ -236,13 +236,19 @@ class SubsystemWidget(QWidget):
 
         return (ss_history, curr_pred, ret_period)
 
-    def getConnectionsSet(self, name):
+    def getConnectionsSet(self, name, hide_converters=True):
             behavior = None
             for b in self.subsystem_info.behaviors:
                 if b.name == name:
                     behavior = b
                     break
-            
+
+            if hide_converters:
+                conv_comp = set()
+                for comp in self.subsystem_info.components:
+                    if comp.is_converter:
+                        conv_comp.add(comp.name)
+
             sw_comp = set()
             for b in self.subsystem_info.behaviors:
                 for r in b.running_components:
@@ -262,6 +268,9 @@ class SubsystemWidget(QWidget):
             other_behaviors_comp = sw_comp - current_running
             running = always_running.union(current_running)
 
+            if hide_converters:
+                conv_connections = {}
+
             for c in self.subsystem_info.connections:
                 if ((not c.component_from.strip()) or (not c.component_to.strip())) and not c.unconnected:
                     continue
@@ -278,29 +287,47 @@ class SubsystemWidget(QWidget):
                 else:
                     raise Exception('getConnectionsSet', 'wrong behavior name: ' + name)
 
-#                if not c.component_from.strip():
-#                    conn_tuple = ("abcdefghijkl", c.component_to)
-#                elif not c.component_to.strip():
-#                    conn_tuple = (c.component_from, "abcdefghijkl")
-#                else:
+                c_from = c.component_from
+                c_to = c.component_to
+                unconnected = c.unconnected
+                c_name = c.name
+                if hide_converters:
+                    if c_from in conv_comp:
+                        if not c_from in conv_connections:
+                            conv_connections[c_from] = (None, c_to)
+                            continue
+                        else:
+                            conv_connections[c_from] = (conv_connections[c_from][0], c_to)
+                            c_to = conv_connections[c_from][1]
+                            c_from = conv_connections[c_from][0]
+                            unconnected = False
+                    elif c_to in conv_comp:
+                        if not c_to in conv_connections:
+                            conv_connections[c_to] = (c_from, None)
+                            continue
+                        else:
+                            conv_connections[c_to] = (c_from, conv_connections[c_to][1])
+                            c_from = conv_connections[c_to][0]
+                            c_to = conv_connections[c_to][1]
+                            unconnected = False
 
-                if not c.unconnected:
-                    conn_tuple = (c.component_from, c.component_to)
+                if not unconnected:
+                    conn_tuple = (c_from, c_to)
                 else:
-                    if not c.component_from.strip():
-                        conn_tuple = (None, c.component_to)
+                    if not c_from.strip():
+                        conn_tuple = (None, c_to)
                     else:
-                        conn_tuple = (c.component_from, None)
+                        conn_tuple = (c_from, None)
 
-                if c.name:
-                    cname = c.name
+                if c_name:
+                    cname = c_name
                 elif c.port_from.strip():
                     cname = c.port_from
-                    if not c.unconnected and cname.endswith("_OUTPORT"):
+                    if not unconnected and cname.endswith("_OUTPORT"):
                         cname = cname[:-8]
                 else:
                     cname = c.port_to
-                    if not c.unconnected and cname.endswith("_INPORT"):
+                    if not unconnected and cname.endswith("_INPORT"):
                         cname = cname[:-7]
 
                 latex_name = c.latex
@@ -315,6 +342,7 @@ class SubsystemWidget(QWidget):
                     conn_set[conn_tuple][1].append(latex_name)
                 else:
                     conn_set[conn_tuple] = [[cname], [latex_name]]
+
             return conn_set
 
     def getComponentNameFromPath(self, path):
@@ -386,10 +414,6 @@ class SubsystemWidget(QWidget):
             latex_formulas = []
 
             draw_unconnected = False
-
-            self.all_connections = []
-            for conn in self.subsystem_info.connections:
-                self.all_connections.append( (conn.component_from, conn.port_from, conn.component_to, conn.port_to) )
 
             conn_set = self.getConnectionsSet(graph_name)
             dot = "digraph " + self.subsystem_name + " {\n"
