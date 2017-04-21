@@ -234,7 +234,12 @@ class SubsystemWidget(QWidget):
         if len(period) == 1:
             ret_period = period[0].childNodes[0].data
 
-        return (ss_history, curr_pred, ret_period)
+        time_tf = mcd[0].getElementsByTagName("t_tf")
+        ret_time_tf = None
+        if len(time_tf) == 1:
+            ret_time_tf = time_tf[0].childNodes[0].data
+
+        return (ss_history, curr_pred, ret_period, ret_time_tf)
 
     def getConnectionsSet(self, name, hide_converters=True):
             behavior = None
@@ -570,7 +575,7 @@ class SubsystemWidget(QWidget):
         if len(mcd[0]) > 0:
             self.SubsystemState.setText(mcd[0][0][0])
             self.dialogHistory.updateState(mcd)
-            self.PeriodWall.setText(mcd[2])
+            self.PeriodWall.setText(mcd[2] + ', ' + mcd[3])
         else:
             self.SubsystemState.setText("unknown")
 
