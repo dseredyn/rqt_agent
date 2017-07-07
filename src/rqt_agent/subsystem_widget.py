@@ -239,7 +239,32 @@ class SubsystemWidget(QWidget):
         if len(time_tf) == 1:
             ret_time_tf = time_tf[0].childNodes[0].data
 
-        return (ss_history, curr_pred, ret_period, ret_time_tf)
+        time_int1 = mcd[0].getElementsByTagName("int1")
+        ret_time_int1 = None
+        if len(time_int1) == 1:
+            ret_time_int1 = time_int1[0].childNodes[0].data
+
+        time_int2 = mcd[0].getElementsByTagName("int2")
+        ret_time_int2 = None
+        if len(time_int2) == 1:
+            ret_time_int2 = time_int2[0].childNodes[0].data
+
+        time_int3 = mcd[0].getElementsByTagName("int3")
+        ret_time_int3 = None
+        if len(time_int3) == 1:
+            ret_time_int3 = time_int3[0].childNodes[0].data
+
+        time_int4 = mcd[0].getElementsByTagName("int4")
+        ret_time_int4 = None
+        if len(time_int4) == 1:
+            ret_time_int4 = time_int4[0].childNodes[0].data
+
+        time_int5 = mcd[0].getElementsByTagName("int5")
+        ret_time_int5 = None
+        if len(time_int5) == 1:
+            ret_time_int5 = time_int5[0].childNodes[0].data
+
+        return (ss_history, curr_pred, ret_period, float(ret_time_int1), float(ret_time_int2), float(ret_time_int3), float(ret_time_int4), float(ret_time_int5))
 
     def getConnectionsSet(self, name, hide_converters=True):
             behavior = None
@@ -420,7 +445,7 @@ class SubsystemWidget(QWidget):
 
             draw_unconnected = False
 
-            conn_set = self.getConnectionsSet(graph_name)
+            conn_set = self.getConnectionsSet(graph_name, hide_converters=False)
             dot = "digraph " + self.subsystem_name + " {\n"
 
             new_page = False
@@ -575,7 +600,7 @@ class SubsystemWidget(QWidget):
         if len(mcd[0]) > 0:
             self.SubsystemState.setText(mcd[0][0][0])
             self.dialogHistory.updateState(mcd)
-            self.PeriodWall.setText(mcd[2] + ', ' + mcd[3])
+            self.PeriodWall.setText(mcd[2] + ', ' + str(mcd[3]*1000.0) + 'ms, ' + str(mcd[4]*1000.0) + 'ms, ' + str(mcd[5]*1000.0) + 'ms, ' + str(mcd[6]*1000.0) + 'ms, ' + str(mcd[7]*1000.0) + 'ms')
         else:
             self.SubsystemState.setText("unknown")
 
